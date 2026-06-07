@@ -12,7 +12,7 @@
 
 1. [产品概述](#1-产品概述)
 2. [系统架构](#2-系统架构)
-3. [Agent 角色体系](#3-agent-角色体系)
+3. [Agent 角色体系](#3-agent-角色体系) ← 含 [智能体管理面板](#35-智能体管理面板agent-manager) + [模型管理面板](#36-模型管理面板model-manager)
 4. [多工作流编排](#4-多工作流编排)
 5. [工作流看板（Workflow Panel）](#5-工作流看板workflow-panel)
 6. [门控共享记忆](#6-门控共享记忆)
@@ -649,6 +649,311 @@ templates:
   pipelines/
     templates.yaml     ← 流水线模板定义 (新增)
 ```
+
+---
+
+### 3.6 模型管理面板（Model Manager）
+
+模型管理面板是 WebUI 中用于**增删改查可用模型、分组管理、能力标注**的管理页面。智能体管理面板（§3.5）中的"默认模型"下拉列表由此面板的模型列表驱动。
+
+#### 3.6.1 页面布局
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  模型管理面板                                      [+ 添加模型] [刷新] │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─ 工具栏 ─────────────────────────────────────────────────────┐    │
+│  │ 🔍 搜索模型...  │ [全部] [budget] [standard] [premium]     │    │
+│  │                │ [Anthropic] [OpenAI] [Google] [DeepSeek]  │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌─ 左侧: 模型列表 ──── 中间: 编辑面板 ──── 右侧: 分组 ──────────┐   │
+│  │                                                               │   │
+│  │ ┌─ 模型列表 ───────────┐  ┌─ 编辑面板 ──────────────────┐    │   │
+│  │ │                       │  │                               │    │   │
+│  │ │ ● claude-sonnet-4    │  │  模型详情: claude-sonnet-4     │    │   │
+│  │ │   Anthropic          │  │                               │    │   │
+│  │ │   ⭐ premium · 200K  │  │  模型名称: [claude-sonnet-4 ] │    │   │
+│  │ │   ✅Vision ✅Tool     │  │  供应商:    [Anthropic    ▾]  │    │   │
+│  │ │                       │  │  模型层:    [premium      ▾]  │    │   │
+│  │ │ ● gpt-4o             │  │  Context:   [200000       ]   │    │   │
+│  │ │   OpenAI             │  │                               │    │   │
+│  │ │   ⭐ premium · 128K  │  │  能力:                         │    │   │
+│  │ │   ✅Vision ✅Tool     │  │  [✓] Vision                   │    │   │
+│  │ │                       │  │  [✓] Tool Calling             │    │   │
+│  │ │ ● gpt-4o-mini        │  │  [ ] Image Generation          │    │   │
+│  │ │   OpenAI             │  │  [ ] Audio/STT                 │    │   │
+│  │ │   ⭐ budget · 128K   │  │                               │    │   │
+│  │ │   ✅Vision ✅Tool     │  │  适用复杂度:                   │    │   │
+│  │ │                       │  │  [✓] SIMPLE                  │    │   │
+│  │ │ ● gemini-2.5-flash   │  │  [✓] MEDIUM                  │    │   │
+│  │ │   Google             │  │  [✓] COMPLEX                 │    │   │
+│  │ │   ⭐ budget · 1M     │  │                               │    │   │
+│  │ │   ✅Vision ✅Tool     │  │  自定义端点:                   │    │   │
+│  │ │                       │  │  [                          ] │    │   │
+│  │ │ ● deepseek-v3        │  │  (留空使用默认)                │    │   │
+│  │ │   DeepSeek           │  │                               │    │   │
+│  │ │   ⭐ standard · 64K  │  │  描述:                         │    │   │
+│  │ │   ❌Vision ✅Tool     │  │  [Anthropic Claude Sonnet 4 ] │    │   │
+│  │ │                       │  │                               │    │   │
+│  │ │ ● minicpmv4.6        │  │  ┌──────────────┐             │    │   │
+│  │ │   OpenBMB            │  │  │ [💾 保存]     │             │    │   │
+│  │ │   ⭐ budget · 8K     │  │  │ [🗑️ 删除]     │             │    │   │
+│  │ │   ✅Vision ❌Tool     │  │  │ [📋 复制]     │             │    │   │
+│  │ │                       │  │  └──────────────┘             │    │   │
+│  │ └───────────────────────┘  └───────────────────────────────┘    │   │
+│  │                                                                │   │
+│  │                              ┌─ 模型分组 ──────────────────┐    │   │
+│  │                              │                               │    │   │
+│  │                              │ 📁 Premium Tier               │    │   │
+│  │                              │   claude-sonnet-4             │    │   │
+│  │                              │   gpt-4o                      │    │   │
+│  │                              │                               │    │   │
+│  │                              │ 📁 Standard Tier              │    │   │
+│  │                              │   deepseek-v3                 │    │   │
+│  │                              │                               │    │   │
+│  │                              │ 📁 Budget Tier                │    │   │
+│  │                              │   gpt-4o-mini                 │    │   │
+│  │                              │   gemini-2.5-flash            │    │   │
+│  │                              │   minicpmv4.6                 │    │   │
+│  │                              │                               │    │   │
+│  │                              │ 📁 Vision-Ready               │    │   │
+│  │                              │   claude-sonnet-4, gpt-4o,   │    │   │
+│  │                              │   gpt-4o-mini, gemini-2.5... │    │   │
+│  │                              │                               │    │   │
+│  │                              │ [+ 新建分组]                   │    │   │
+│  │                              └───────────────────────────────┘    │   │
+│  └──────────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.6.2 模型 CRUD 操作
+
+**创建模型**
+
+用户点击 `[+ 添加模型]`，弹出创建面板：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  添加新模型                                                  │
+│                                                             │
+│  模型名称:     [my-custom-model                       ]     │
+│  供应商:       [OpenAI ▾]  [自定义 ▾]                       │
+│  模型层:       ● budget  ○ standard  ○ premium              │
+│  Context长度:  [128000                                ]     │
+│                                                             │
+│  能力:                                                       │
+│  [✓] Vision          [✓] Tool Calling                       │
+│  [ ] Image Gen       [ ] Audio/STT                          │
+│                                                             │
+│  适用复杂度:                                                 │
+│  [✓] SIMPLE  [✓] MEDIUM  [ ] COMPLEX                       │
+│                                                             │
+│  自定义端点:     [https://my-api.com/v1               ]     │
+│  自定义 API Key: [sk-...                              ]     │
+│  (API Key 存储为环境变量引用: ${MY_MODEL_API_KEY})          │
+│                                                             │
+│  描述:          [Custom fine-tuned model for...       ]     │
+│                                                             │
+│  [取消]                              [✅ 添加模型]          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**字段说明**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| 模型名称 | string | 唯一标识，如 `claude-sonnet-4`、`my-finetuned-v1` |
+| 供应商 | enum | 从供应商列表选择或自定义输入 |
+| 模型层 | enum | `budget` / `standard` / `premium` |
+| Context长度 | int | Token 上限 |
+| Vision | bool | 是否支持图像/视频输入 |
+| Tool Calling | bool | 是否支持 Function Calling |
+| Image Gen | bool | 是否支持图像生成 |
+| Audio/STT | bool | 是否支持语音转文字 |
+| 适用复杂度 | multi | SIMPLE / MEDIUM / COMPLEX |
+| 自定义端点 | url | 自部署模型的 API 端点 |
+| 自定义 API Key | string | 引用环境变量，不存明文 |
+
+#### 3.6.3 模型分组（Model Group）
+
+支持按多种维度分组：
+
+| 分组维度 | 预设组 | 用途 |
+|----------|--------|------|
+| **按模型层** | Premium / Standard / Budget | 复杂度路由时快速筛选 |
+| **按供应商** | Anthropic / OpenAI / Google / DeepSeek / 自定义 | 供应商管理 |
+| **按能力** | Vision-Ready / Tool-Calling / Vision-Only / Text-Only | 能力兼容性校验 |
+| **按场景** | 长文档处理 / 代码生成 / 多模态 / 低成本 | 智能体推荐模型 |
+
+**分组操作**
+
+- **创建分组**: 输入组名 + 选择分组维度 + 拖入模型
+- **成员管理**: 拖拽排序（影响智能体面板下拉列表的默认排序）
+- **一个模型可属于多个分组**（如 `gpt-4o` 同时属于 `Premium Tier` 和 `Vision-Ready` 和 `OpenAI`）
+- **删除分组**: 仅删除分组，不影响模型
+
+#### 3.6.4 与智能体管理面板的集成
+
+智能体管理面板（§3.5）中 Worker 的"默认模型"下拉列表由模型面板驱动：
+
+```
+┌─ Worker 编辑面板 ──────────────────────┐
+│                                         │
+│  默认模型: [claude-sonnet-4       ▾]   │
+│            ┌────────────────────────┐   │
+│            │ 📁 Premium Tier        │   │
+│            │   claude-sonnet-4      │   │
+│            │   gpt-4o               │   │
+│            │ 📁 Standard Tier       │   │
+│            │   deepseek-v3          │   │
+│            │ 📁 Budget Tier         │   │
+│            │   gpt-4o-mini          │   │
+│            │   gemini-2.5-flash     │   │
+│            │ 📁 Vision-Ready        │   │
+│            │   claude-sonnet-4, ... │   │
+│            └────────────────────────┘   │
+│                                         │
+│  备选模型: [gpt-4o              ] [✕]  │
+│            [+ 添加备选模型]             │
+│                                         │
+│  模型层偏好: ○ 仅使用默认模型            │
+│             ● 优先默认，允许降级          │
+│             ○ 自动选择最优               │
+└─────────────────────────────────────────┘
+```
+
+**集成逻辑**:
+
+```
+智能体面板选择模型
+    │
+    ├─ 下拉列表来源: 模型面板中所有 active=true 的模型
+    ├─ 分组显示: 按模型层分组 (Premium → Standard → Budget)
+    ├─ 能力过滤: 仅显示与 Worker 需求匹配的模型
+    │    (如 Worker 需要 Vision → 自动过滤 Vision=false 的模型)
+    └─ 备选模型: Worker 可配置 1-3 个备选，主模型不可用时自动切换
+```
+
+#### 3.6.5 模型供应商管理
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  供应商管理                                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ ● Anthropic                                                   │    │
+│  │   API Base: https://api.anthropic.com                         │    │
+│  │   模型数量: 1  │  状态: ✅ 可用                                │    │
+│  │  API Key: ${ANTHROPIC_API_KEY}                                │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ ● OpenAI                                                      │    │
+│  │   API Base: https://api.openai.com/v1                         │    │
+│  │   模型数量: 2  │  状态: ✅ 可用                                │    │
+│  │  API Key: ${OPENAI_API_KEY}                                   │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ ● 自定义供应商                                                 │    │
+│  │   API Base: https://my-openrouter.com/v1                      │    │
+│  │   模型数量: 3  │  状态: ✅ 可用                                │    │
+│  │  API Key: ${CUSTOM_API_KEY}                                   │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  [+ 添加供应商]                                                       │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.6.6 数据模型
+
+```yaml
+# ~/.hermes/opc/models/models.yaml
+models:
+  - id: claude-sonnet-4
+    display_name: Claude Sonnet 4
+    provider: anthropic
+    tier: premium
+    context_length: 200000
+    capabilities:
+      vision: true
+      tool_calling: true
+      image_gen: false
+      audio_stt: false
+    suitable_complexity: [SIMPLE, MEDIUM, COMPLEX]
+    api_base: null       # null = use provider default
+    api_key_ref: null    # null = use provider default
+    active: true
+    description: "Anthropic Claude Sonnet 4 — best-in-class reasoning"
+
+  - id: my-finetuned-v1
+    display_name: My Finetuned V1
+    provider: custom
+    tier: standard
+    context_length: 64000
+    capabilities:
+      vision: false
+      tool_calling: true
+      image_gen: false
+      audio_stt: false
+    suitable_complexity: [SIMPLE, MEDIUM]
+    api_base: https://my-api.com/v1
+    api_key_ref: ${MY_FINETUNED_KEY}
+    active: true
+    description: "Custom fine-tuned model for code review tasks"
+
+# ~/.hermes/opc/models/groups.yaml
+groups:
+  - id: premium_tier
+    name: Premium Tier
+    dimension: tier
+    model_ids: [claude-sonnet-4, gpt-4o]
+
+  - id: vision_ready
+    name: Vision-Ready
+    dimension: capability
+    filter: {vision: true}
+
+  - id: code_generation
+    name: Code Generation
+    dimension: scenario
+    model_ids: [claude-sonnet-4, gpt-4o, deepseek-v3]
+
+# ~/.hermes/opc/models/providers.yaml
+providers:
+  - id: anthropic
+    name: Anthropic
+    api_base: https://api.anthropic.com
+    api_key_ref: ${ANTHROPIC_API_KEY}
+
+  - id: openai
+    name: OpenAI
+    api_base: https://api.openai.com/v1
+    api_key_ref: ${OPENAI_API_KEY}
+
+  - id: custom
+    name: 自定义
+    api_base: ""
+    api_key_ref: ""
+```
+
+#### 3.6.7 模型面板 API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/models` | GET | 模型列表（支持 `?tier=`, `?provider=`, `?capability=` 过滤） |
+| `/api/models` | POST | 创建新模型 |
+| `/api/models/:id` | PUT | 更新模型 |
+| `/api/models/:id` | DELETE | 删除模型（检查是否被 Worker 引用） |
+| `/api/models/groups` | GET/POST | 分组列表 / 创建分组 |
+| `/api/models/groups/:id` | PUT/DELETE | 更新/删除分组 |
+| `/api/models/providers` | GET/POST | 供应商列表 / 添加供应商 |
+| `/api/models/validate/:id` | POST | 测试模型连接（发送简单 API 调用验证 endpoint + key） |
 
 ---
 
@@ -1416,18 +1721,21 @@ OPC-Hermes WebUI 采用 **taste-skill 驱动的暗色仪表盘设计**，专为�
 
 ### 12.2 页面清单
 
-| 页面 | 路由 | 功能 |
-|------|------|------|
-| **Dashboard** | `/` | 5 统计卡片 + 质量趋势图 |
-| **Agent List** | `/agents` | 角色过滤 + 搜索 + 卡片网格 |
-| **Agent Detail** | `/agents/:id` | 技能标签 + 评估历史 + 分数趋势 |
-| **Workflow Panel** | `/workflows` | 多工作流看板（卡片 + DAG 缩略图） |
-| **Task List** | `/tasks` | 任务发现 + 状态筛选 |
-| **Task Detail** | `/tasks/:id` | DAG 可视化 + 步骤详情 + Summary Bridge 流向 |
-| **Memory Browser** | `/memory` | 分区浏览 (Project/Eval/KB) |
-| **Artifact Viewer** | `/artifacts` | 版本化产物浏览 |
-| **Proposal Review** | `/proposals` | 优化提案审批流 |
-| **Config** | `/config` | JSON 编辑器 + 保存 |
+| 页面 | 路由 | 功能 | 设计章节 |
+|------|------|------|---------|
+| **Dashboard** | `/` | 5 统计卡片 + 质量趋势图 | §12.2 |
+| **Agent Manager** | `/agents/manage` | 智能体 CRUD + 分组 + 流水线模板 | §3.5 |
+| **Agent List** | `/agents` | 角色过滤 + 搜索 + 卡片网格 | §3.2 |
+| **Agent Detail** | `/agents/:id` | 技能标签 + 评估历史 + 分数趋势 | §3.2 |
+| **Model Manager** | `/models` | 模型 CRUD + 分组 + 供应商管理 + 能力标注 | §3.6 |
+| **Pipeline Templates** | `/pipelines` | 专用流水线模板管理（创建/编辑/使用） | §3.5.4 |
+| **Workflow Panel** | `/workflows` | 多工作流看板（卡片 + DAG 缩略图 + 四 Tab 详情） | §5 |
+| **Task List** | `/tasks` | 任务发现 + 状态筛选 | §5 |
+| **Task Detail** | `/tasks/:id` | DAG 可视化 + 步骤详情 + Summary Bridge 流向 | §5.3 |
+| **Memory Browser** | `/memory` | 分区浏览 (Project/Eval/KB) | §6 |
+| **Artifact Viewer** | `/artifacts` | 版本化产物浏览 | §5.3.4 |
+| **Proposal Review** | `/proposals` | 优化提案审批流 | §9 |
+| **Config** | `/config` | JSON 编辑器 + 保存 | §12 |
 
 ### 12.3 API 端点
 
@@ -1436,9 +1744,22 @@ OPC-Hermes WebUI 采用 **taste-skill 驱动的暗色仪表盘设计**，专为�
 | `/api/dashboard` | GET | 聚合统计 + 质量趋势 |
 | `/api/agents` | GET | Worker 列表 |
 | `/api/agents/:id` | GET | Worker 详情 + 技能 + 评估 |
+| `/api/agents/:id` | PUT | 更新 Worker 配置（§3.5 CRUD） |
+| `/api/agents/:id` | DELETE | 删除 Worker（检查流水线引用） |
+| `/api/agents/groups` | GET/POST | 智能体组列表 / 创建分组（§3.5.3） |
+| `/api/agents/groups/:id` | PUT/DELETE | 更新/删除智能体组 |
+| `/api/pipelines` | GET/POST | 流水线模板列表 / 创建模板（§3.5.4） |
+| `/api/pipelines/:id` | PUT/DELETE | 更新/删除流水线模板 |
+| `/api/models` | GET/POST | 模型列表 / 创建模型（§3.6） |
+| `/api/models/:id` | PUT/DELETE | 更新/删除模型 |
+| `/api/models/groups` | GET/POST | 模型分组列表 / 创建分组（§3.6.3） |
+| `/api/models/providers` | GET/POST | 供应商列表 / 添加供应商（§3.6.5） |
+| `/api/models/validate/:id` | POST | 测试模型连接 |
 | `/api/workflows` | GET | 活跃工作流列表（看板数据） |
 | `/api/tasks` | GET | 任务列表 |
 | `/api/tasks/:id` | GET | DAG 数据 + 步骤详情 |
+| `/api/tasks/:id/agents` | GET | 每个 Worker 完整状态 + 上下游（§5.7） |
+| `/api/tasks/:id/memory-strategy` | GET | 门控规则 + SummaryBridge 数据（§5.7） |
 | `/api/memory/:partition` | GET | 记忆分区浏览 |
 | `/api/knowledge/search` | GET | KB 搜索 |
 | `/api/artifacts` | GET | 产物浏览 |

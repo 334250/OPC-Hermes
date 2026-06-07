@@ -18,6 +18,7 @@ Requires:  pip install fastapi uvicorn
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -49,9 +50,12 @@ app = FastAPI(
     description="Multi-agent management dashboard for OPC-Hermes",
 )
 
+# CORS origins — configurable via OPC_WEBUI_CORS_ORIGINS (comma-separated)
+# Defaults to localhost dev servers; use "*" only in dev
+_cors_origins = os.environ.get("OPC_WEBUI_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins.split(",") if _cors_origins != "*" else ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -116,23 +120,23 @@ async def dashboard():
     except Exception:
         pending = 0
 
-    return {
-        # Count active (in_progress) tasks
+    # Count active (in_progress) tasks
+    active_tasks = 0
+    try:
+        recent_evals_all = memory.get_evaluations(limit=200)
+        seen_tasks: set = set()
+        for e in recent_evals_all:
+            if e.task_id not in seen_tasks:
+                seen_tasks.add(e.task_id)
+                reports = memory.get_progress_reports(e.task_id)
+                if any(r.status == "in_progress" for r in reports):
+                    active_tasks += 1
+        if active_tasks == 0 and seen_tasks:
+            active_tasks = max(0, min(5, len(seen_tasks) // 2))
+    except Exception:
         active_tasks = 0
-        try:
-            recent_evals_all = memory.get_evaluations(limit=200)
-            seen_tasks: set = set()
-            for e in recent_evals_all:
-                if e.task_id not in seen_tasks:
-                    seen_tasks.add(e.task_id)
-                    reports = memory.get_progress_reports(e.task_id)
-                    if any(r.status == "in_progress" for r in reports):
-                        active_tasks += 1
-            if active_tasks == 0 and seen_tasks:
-                active_tasks = max(0, min(5, len(seen_tasks) // 2))  # estimate
-        except Exception:
-            active_tasks = 0
 
+    return {
         "stats": {
             "active_tasks": active_tasks,
             "total_workers": total_workers,

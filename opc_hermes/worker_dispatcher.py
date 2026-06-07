@@ -69,10 +69,12 @@ class OPCWorkerDispatcher:
         *,
         failure_policy: Optional[Dict[str, FailurePolicy]] = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        evaluator_enabled: bool = True,
     ):
         self._agent_registry = None
         self.failure_policy = failure_policy or DEFAULT_FAILURE_POLICY
         self.max_retries = max_retries
+        self.evaluator_enabled = evaluator_enabled
 
     @property
     def registry(self):
@@ -327,6 +329,11 @@ class OPCWorkerDispatcher:
                     self.registry.record_task_outcome(worker_id, success=True)
                 except Exception:
                     pass
+
+                # ── Phase 3: Trigger evaluator ───────────────────────────
+                if self.evaluator_enabled:
+                    self._evaluate_step(task_id, step, result)
+
                 return result
 
             # Failed — determine what to do
@@ -552,6 +559,40 @@ class OPCWorkerDispatcher:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         memory.write_to_bridge(entry)
+
+    # ── Evaluator trigger (Phase 3) ──────────────────────────────────────
+
+    def _evaluate_step(
+        self, task_id: str, step: Dict[str, Any], result: Dict[str, Any],
+    ) -> None:
+        """Trigger evaluator after a step completes (non-blocking, failure-isolated)."""
+        try:
+            from opc_hermes.evaluator import LocalEvaluator
+
+            evaluator = LocalEvaluator()
+            worker_id = result.get("worker_id", "unknown")
+            worker = self.registry.get_worker(worker_id)
+            is_leader = worker is not None and worker.role == "leader"
+
+            eval_result = evaluator.evaluate_and_write(
+                task_id=task_id,
+                worker_id=worker_id,
+                task_prompt=step.get("prompt", ""),
+                output=result.get("output", ""),
+                expected_format=step.get("expected_output_format", ""),
+                tool_calls=result.get("tool_calls", 0),
+                status=result.get("status", "completed"),
+                is_leader=is_leader,
+            )
+            logger.info(
+                "Evaluator scored %s: avg=%.2f (%s)",
+                worker_id,
+                sum(eval_result["scores"].values()) / max(len(eval_result["scores"]), 1),
+                eval_result.get("notes", "")[:80],
+            )
+        except Exception as exc:
+            # P3-8: Evaluator failure never blocks task delivery
+            logger.warning("Evaluator failed for %s/%s: %s", task_id, result.get("worker_id", "?"), exc)
 
     # ── Helpers ──────────────────────────────────────────────────────────
 

@@ -27,7 +27,7 @@ class TaskProtocol:
     step_index: int                    # position in the DAG
     prompt: str                        # the task prompt (self-contained)
     complexity: str                    # SIMPLE | MEDIUM | COMPLEX
-    model: str                         # resolved model to use
+    model: str = ""                    # resolved model to use
     upstream_step_indices: List[int] = field(default_factory=list)
     expected_output_format: str = ""   # e.g., "markdown", "json", ".pptx"
     max_iterations: int = 60

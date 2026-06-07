@@ -1,0 +1,46 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+.venv/
+venv/
+
+.env
+.env.*
+config.yaml
+opc.yaml
+local*.yaml
+*.local.yaml
+*.secret.*
+secrets.*
+*.pem
+*.key
+*.crt
+
+*.egg-info/
+build/
+dist/
+
+# OPC-Hermes runtime state
+.hermes/
+memory/
+artifacts/
+proposals/
+logs/
+*.db
+*.db-shm
+*.db-wal
+
+# Node/WebUI build artifacts
+node_modules/
+webui/dist/
+webui/.vite/
+
+# Upstream reference checkout; do not vendor it into OPC-Hermes releases.
+hermes-agent/

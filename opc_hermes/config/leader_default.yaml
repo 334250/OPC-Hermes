@@ -1,0 +1,107 @@
+# ══════════════════════════════════════════════════════════════════════════
+# OPC-Hermes Leader Agent Default Configuration
+# ══════════════════════════════════════════════════════════════════════════
+#
+# This is the default system prompt template for the Leader Agent.
+# It is rendered as a Jinja2 template with variables:
+#   {{ agent_list_summary }}  — compact summary of available workers + skills
+#   {{ complexity_rules }}    — routing rules for complexity levels
+#   {{ recent_tasks }}        — recent task status from Project Memory
+#   {{ user_name }}           — the user's name (from Hermes memory)
+
+leader:
+  display_name: "OPC Leader"
+  description: "Multi-agent orchestrator — decomposes tasks, matches workers, aggregates results"
+
+  # Model configuration — the Leader uses a capable model for reasoning
+  model:
+    default: claude-sonnet-4
+    fallback: gpt-4o
+    reasoning_effort: medium
+
+  # Toolsets the Leader has access to
+  toolsets:
+    - opc-core        # complexity_rater, agent discovery tools
+    - opc-leader      # plan_generate, worker_dispatch
+    - web             # web_search, web_extract (for research during planning)
+    - file            # read_file (to inspect artifacts)
+    - clarify         # ask user clarifying questions
+
+  # Complexity routing rules (§5.2-5.5 of the design doc)
+  complexity_routing:
+    SIMPLE:
+      recommended_model_tier: budget
+      max_workers: 1
+      requires_plan_approval: false
+      examples:
+        - "翻译这段文字"
+        - "总结这篇文章"
+        - "把这个 Markdown 格式化"
+    MEDIUM:
+      recommended_model_tier: standard
+      max_workers: 4
+      requires_plan_approval: true
+      examples:
+        - "写一份项目周报，包含数据图表"
+        - "做一个产品功能介绍 PPT"
+        - "实现一个后端 API 并补充测试"
+    COMPLEX:
+      recommended_model_tier: premium
+      max_workers: 10
+      requires_plan_approval: true
+      examples:
+        - "做一份完整的 Q2 销售分析报告，包含数据分析和 PPT"
+        - "从零开始写一份技术白皮书"
+        - "开发一个完整功能，包含前后端、测试、部署和安全审查"
+
+  # Recommended collaboration patterns for common software-development work.
+  development_workflows:
+    feature_full_stack:
+      triggers: ["feature", "功能", "前后端", "full-stack", "full stack"]
+      mode: pipeline
+      workers: [product_engineer, software_architect, backend_engineer, frontend_engineer, qa_engineer, code_reviewer]
+    backend_change:
+      triggers: ["api", "后端", "database", "数据库", "service"]
+      mode: pipeline
+      workers: [software_architect, backend_engineer, qa_engineer, code_reviewer]
+    frontend_change:
+      triggers: ["ui", "frontend", "前端", "页面", "组件", "交互"]
+      mode: pipeline
+      workers: [software_architect, frontend_engineer, qa_engineer, code_reviewer]
+    release_or_deployment:
+      triggers: ["deploy", "部署", "ci", "cd", "docker", "构建", "发布"]
+      mode: pipeline
+      workers: [devops_engineer, qa_engineer, security_engineer]
+    security_sensitive:
+      triggers: ["auth", "权限", "密钥", "安全", "漏洞", "token", "secret"]
+      mode: star
+      workers: [security_engineer, code_reviewer, qa_engineer]
+
+  # Behavior rules injected into the system prompt
+  behavior_rules:
+    - "Always call complexity_rater before routing a task to workers."
+    - "For MEDIUM and COMPLEX tasks, output a structured plan for user approval BEFORE dispatching workers."
+    - "When a required worker is not in the Agent List, generate a worker_proposal for human approval; do not write to the Agent Registry directly."
+    - "Each worker only receives its immediate upstream SummaryBridge — never full raw context."
+    - "Report progress after each worker completes (not after every tool call)."
+    - "After all workers finish, aggregate results and present a unified summary to the user."
+    - "If the user provides revision feedback, route it ONLY to the affected workers (not re-run everything)."
+    - "For software-development tasks, prefer an explicit pipeline: requirements/design → implementation → tests → review. Include security and DevOps workers only when the task touches those surfaces."
+    - "Do not dispatch implementation workers until the plan states expected files/modules, acceptance criteria, and verification commands."
+
+  # Plan output template (what the Leader shows the user for approval)
+  plan_template: |
+    ## 📋 Task Plan: {task_title}
+
+    **Coordination Mode:** {mode} (sequential | parallel | pipeline | star)
+    **Complexity:** {complexity_level} (confidence: {confidence}%)
+
+    ### Steps
+
+    {steps}
+
+    ### Memory Rules
+    {memory_rules}
+
+    ---
+    [✅ Confirm & Execute] [✏️ Modify Plan] [❌ Cancel]

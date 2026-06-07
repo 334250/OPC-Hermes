@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPC-Hermes 系统架构图</title>
+    <style>
+        :root {
+            --opc-bg: #0d1117;
+            --opc-card: #161b22;
+            --opc-border: #30363d;
+            --opc-accent: #d4a853;
+            --opc-text: #e6edf3;
+            --opc-text-muted: #8b949e;
+            --opc-success: #3fb950;
+            --opc-warning: #d29922;
+            --opc-danger: #f85149;
+            --opc-info: #58a6ff;
+            --opc-purple: #a371f7;
+            --opc-teal: #2dd4bf;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--opc-bg);
+            color: var(--opc-text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--opc-accent), #f0d78c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--opc-text-muted);
+            margin-bottom: 48px;
+            font-size: 0.95rem;
+        }
+
+        /* Section titles */
+        .section-title {
+            font-size: 1.3rem;
+            color: var(--opc-accent);
+            margin: 48px 0 24px;
+            padding-left: 12px;
+            border-left: 3px solid var(--opc-accent);
+        }
+
+        /* Architecture layers */
+        .arch-wrapper {
+            position: relative;
+        }
+
+        .layer {
+            border: 1px solid var(--opc-border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            position: relative;
+            background: var(--opc-card);
+        }
+
+        .layer-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: var(--opc-card);
+            padding: 2px 12px;
+            font-size: 0.8rem;
+            color: var(--opc-text-muted);
+            border: 1px solid var(--opc-border);
+            border-radius: 4px;
+        }
+
+        .layer-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .layer-title .badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .badge-new { background: rgba(63, 185, 80, 0.15); color: var(--opc-success); border: 1px solid rgba(63, 185, 80, 0.3); }
+        .badge-existing { background: rgba(88, 166, 255, 0.15); color: var(--opc-info); border: 1px solid rgba(88, 166, 255, 0.3); }
+        .badge-plugin { background: rgba(163, 113, 247, 0.15); color: var(--opc-purple); border: 1px solid rgba(163, 113, 247, 0.3); }
+
+        /* Grid layouts */
+        .components-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .component {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--opc-border);
+            border-radius: 8px;
+            padding: 14px;
+            transition: all 0.2s;
+        }
+
+        .component:hover {
+            border-color: var(--opc-accent);
+            box-shadow: 0 0 12px rgba(212, 168, 83, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .component-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .component-desc {
+            font-size: 0.78rem;
+            color: var(--opc-text-muted);
+            line-height: 1.4;
+        }
+
+        /* Flow arrows */
+        .flow-connector {
+            text-align: center;
+            padding: 8px 0;
+            color: var(--opc-accent);
+            font-size: 1.4rem;
+        }
+
+        .flow-connector .label {
+            font-size: 0.75rem;
+            color: var(--opc-text-muted);
+            display: block;
+        }
+
+        /* Data flow section */
+        .dataflow {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .dataflow-step {
+            display: flex;
+            align-items: stretch;
+            gap: 16px;
+        }
+
+        .step-number {
+            min-width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--opc-accent);
+            color: var(--opc-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--opc-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .step-desc {
+            font-size: 0.8rem;
+            color: var(--opc-text-muted);
+        }
+
+        /* Integration diagram */
+        .integration-diagram {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .integration-left, .integration-right {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .integration-bridge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 12px;
+        }
+
+        .bridge-arrow {
+            color: var(--opc-accent);
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .int-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--opc-border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+        }
+
+        /* Worker agents grid */
+        .workers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .worker-card {
+            background: rgba(63, 185, 80, 0.05);
+            border: 1px solid rgba(63, 185, 80, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .worker-card:hover {
+            border-color: var(--opc-success);
+            transform: translateY(-2px);
+        }
+
+        .worker-icon { font-size: 1.5rem; margin-bottom: 4px; }
+        .worker-name { font-size: 0.82rem; font-weight: 600; }
+        .worker-skills { font-size: 0.7rem; color: var(--opc-text-muted); margin-top: 4px; }
+
+        /* Memory architecture */
+        .memory-layers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .mem-block {
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid;
+        }
+
+        .mem-project { background: rgba(88, 166, 255, 0.05); border-color: rgba(88, 166, 255, 0.3); }
+        .mem-eval { background: rgba(163, 113, 247, 0.05); border-color: rgba(163, 113, 247, 0.3); }
+        .mem-kb { background: rgba(45, 212, 191, 0.05); border-color: rgba(45, 212, 191, 0.3); }
+
+        .mem-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .mem-items {
+            list-style: none;
+            font-size: 0.78rem;
+            color: var(--opc-text-muted);
+        }
+
+        .mem-items li {
+            padding: 3px 0;
+            padding-left: 12px;
+            position: relative;
+        }
+
+        .mem-items li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--opc-accent);
+        }
+
+        /* WebUI section */
+        .webui-layout {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 16px;
+            border: 1px solid var(--opc-border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--opc-card);
+        }
+
+        .webui-sidebar {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 16px;
+            border-right: 1px solid var(--opc-border);
+        }
+
+        .webui-sidebar-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .webui-sidebar-item:hover { background: rgba(212, 168, 83, 0.1); }
+        .webui-sidebar-item.active { background: rgba(212, 168, 83, 0.15); color: var(--opc-accent); }
+
+        .webui-main {
+            padding: 20px;
+        }
+
+        .webui-pages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+
+        .webui-page {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--opc-border);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.82rem;
+        }
+
+        .webui-page-title { font-weight: 600; margin-bottom: 4px; }
+        .webui-page-desc { font-size: 0.72rem; color: var(--opc-text-muted); }
+
+        /* Tech stack */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+        }
+
+        .tech-category {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--opc-border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .tech-category-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--opc-accent);
+            margin-bottom: 8px;
+        }
+
+        .tech-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.78rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .tech-item:last-child { border-bottom: none; }
+        .tech-name { color: var(--opc-text); }
+        .tech-role { color: var(--opc-text-muted); }
+
+        /* Principle cards */
+        .principles {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .principle-card {
+            border: 1px solid var(--opc-border);
+            border-radius: 8px;
+            padding: 16px;
+            background: var(--opc-card);
+        }
+
+        .principle-card h4 {
+            font-size: 0.9rem;
+            color: var(--opc-accent);
+            margin-bottom: 6px;
+        }
+
+        .principle-card p {
+            font-size: 0.78rem;
+            color: var(--opc-text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .memory-layers { grid-template-columns: 1fr; }
+            .integration-diagram { grid-template-columns: 1fr; }
+            .webui-layout { grid-template-columns: 1fr; }
+            .webui-sidebar { border-right: none; border-bottom: 1px solid var(--opc-border); }
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 32px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--opc-border);
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--opc-text-muted);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-new { background: var(--opc-success); }
+        .dot-existing { background: var(--opc-info); }
+        .dot-plugin { background: var(--opc-purple); }
+        .dot-storage { background: var(--opc-teal); }
+
+        /* DAG visualization */
+        .dag-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px;
+            gap: 8px;
+        }
+
+        .dag-node {
+            border: 2px solid;
+            border-radius: 10px;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 0.82rem;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .dag-node-leader { border-color: var(--opc-accent); background: rgba(212, 168, 83, 0.1); }
+        .dag-node-worker { border-color: var(--opc-success); background: rgba(63, 185, 80, 0.08); }
+        .dag-node-eval { border-color: var(--opc-purple); background: rgba(163, 113, 247, 0.08); }
+        .dag-node-storage { border-color: var(--opc-teal); background: rgba(45, 212, 191, 0.08); }
+
+        .dag-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .dag-arrow {
+            color: var(--opc-accent);
+            font-size: 1.2rem;
+        }
+
+        .dag-arrow-label {
+            font-size: 0.7rem;
+            color: var(--opc-text-muted);
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1c2128;
+            color: var(--opc-text);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            border: 1px solid var(--opc-border);
+            z-index: 10;
+        }
+
+        .tooltip:hover::after { opacity: 1; }
+
+        /* Hermes base layer highlight */
+        .hermes-layer {
+            border-color: rgba(88, 166, 255, 0.3);
+            background: rgba(88, 166, 255, 0.03);
+        }
+
+        .opc-layer {
+            border-color: rgba(212, 168, 83, 0.3);
+            background: rgba(212, 168, 83, 0.03);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--opc-border);
+            color: var(--opc-text-muted);
+            font-size: 0.78rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OPC-Hermes 系统架构图</h1>
+        <p class="subtitle">Orchestrated Professional Colleagues — 基于 Hermes Agent 的多 Agent 管理层</p>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot dot-new"></div>OPC-Hermes 新增组件</div>
+            <div class="legend-item"><div class="legend-dot dot-existing"></div>Hermes Agent 既有组件</div>
+            <div class="legend-item"><div class="legend-dot dot-plugin"></div>插件集成点</div>
+            <div class="legend-item"><div class="legend-dot dot-storage"></div>共享存储层</div>
+        </div>
+
+        <!-- Design Principles -->
+        <h2 class="section-title">核心设计原则</h2>
+        <div class="principles">
+            <div class="principle-card">
+                <h4>🔒 不修改 Hermes Agent 源码</h4>
+                <p>以插件、配置注入、外部编排的方式工作。Hermes Agent 升级时 OPC-Hermes 不受影响。</p>
+            </div>
+            <div class="principle-card">
+                <h4>🧠 记忆天生隔离</h4>
+                <p>项目记忆、评估记忆、知识库三者物理/逻辑分离，评估 Agent 不污染执行 Agent 的上下文。</p>
+            </div>
+            <div class="principle-card">
+                <h4>📊 复杂度即 Skill</h4>
+                <p>复杂度判定是一个可复用、可独立进化的共享 Skill，非内嵌逻辑。</p>
+            </div>
+            <div class="principle-card">
+                <h4>🔄 进化有据可查</h4>
+                <p>每次模型切换、工具替换、Prompt 变更都经过数据驱动的提案→审批→切换流程。</p>
+            </div>
+        </div>
+
+        <!-- Main Architecture -->
+        <h2 class="section-title">分层架构总览</h2>
+        <div class="arch-wrapper">
+
+            <!-- User Input Layer -->
+            <div class="layer" style="border-color: rgba(255,255,255,0.2);">
+                <div class="layer-label">用户入口</div>
+                <div class="layer-title">👤 用户请求入口</div>
+                <div class="components-grid">
+                    <div class="component">
+                        <div class="component-name">💬 消息平台</div>
+                        <div class="component-desc">Telegram / Discord / 微信 / Slack / 飞书 等 32 平台</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🌐 OPC WebUI</div>
+                        <div class="component-desc">独立 React 前端 (端口 9120)，DAG 可视化 + 任务管理</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">⌨️ CLI 命令</div>
+                        <div class="component-desc">hermes opc start / hermes opc ui / hermes opc status</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-connector">▼<span class="label">消息路由</span></div>
+
+            <!-- Hermes Gateway Layer -->
+            <div class="layer hermes-layer">
+                <div class="layer-label">Hermes Agent 既有</div>
+                <div class="layer-title">
+                    🌐 Hermes Agent Gateway
+                    <span class="badge badge-existing">不修改</span>
+                </div>
+                <div class="components-grid">
+                    <div class="component">
+                        <div class="component-name">gateway/run.py</div>
+                        <div class="component-desc">Gateway 主进程 (~18k LOC)，消息平台接入层</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">platforms/</div>
+                        <div class="component-desc">22 个消息平台适配器（Telegram, Discord, WeChat...）</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">session.py</div>
+                        <div class="component-desc">Gateway 会话管理，用户身份识别</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name tooltip" data-tip="OPC Plugin 通过此 hook 拦截复杂任务">pre_gateway_dispatch</div>
+                        <div class="component-desc">OPC Plugin Hook：判断任务复杂度→路由到 Leader</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-connector">▼<span class="label">复杂任务路由到 Leader Agent</span></div>
+
+            <!-- OPC Leader Layer -->
+            <div class="layer opc-layer">
+                <div class="layer-label">OPC-Hermes 新增</div>
+                <div class="layer-title">
+                    👑 Leader Agent（调度中枢 = Orchestrator）
+                    <span class="badge badge-new">OPC 新增</span>
+                </div>
+                <div class="components-grid">
+                    <div class="component">
+                        <div class="component-name">🎯 意图解析</div>
+                        <div class="component-desc">LLM 推理，识别任务类型与所需能力</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">📏 ComplexityRater</div>
+                        <div class="component-desc">共享 Skill，输出 {level, confidence, reasoning}</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🔍 Worker 发现</div>
+                        <div class="component-desc">查询 Agent List，语义匹配所需能力</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">📋 计划生成</div>
+                        <div class="component-desc">DAG 拆解 + 循环检测 + 用户确认</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">⚙️ DAG 执行器</div>
+                        <div class="component-desc">dag_executor.py：编排 Worker 的执行顺序与并行度</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🔄 修订处理</div>
+                        <div class="component-desc">revision_handler.py：分析修改意见→分发修订子任务</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🧭 模型路由</div>
+                        <div class="component-desc">model_prefs.py：用户偏好 > Leader推荐 > 复杂度路由</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">💾 恢复点管理</div>
+                        <div class="component-desc">recovery.py：中断恢复 + 实时存档</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-connector">▼<span class="label">TaskProtocol 任务派发 (subprocess)</span></div>
+
+            <!-- Worker Layer -->
+            <div class="layer opc-layer">
+                <div class="layer-label">OPC-Hermes 新增 (每个 Worker = 标准 Hermes Agent 实例)</div>
+                <div class="layer-title">
+                    🤖 Worker Agent 层（12 个角色化 Agent）
+                    <span class="badge badge-new">OPC 新增</span>
+                </div>
+                <div class="workers-grid">
+                    <div class="worker-card">
+                        <div class="worker-icon">🔍</div>
+                        <div class="worker-name">研究员</div>
+                        <div class="worker-skills">web_search, paper_fetch</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">✍️</div>
+                        <div class="worker-name">书写员</div>
+                        <div class="worker-skills">chapter_writing, markdown</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">🎨</div>
+                        <div class="worker-name">画图师</div>
+                        <div class="worker-skills">flowchart, data_chart</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📐</div>
+                        <div class="worker-name">排版师</div>
+                        <div class="worker-skills">markdown_format, pandoc</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📝</div>
+                        <div class="worker-name">审稿员</div>
+                        <div class="worker-skills">grammar_check, consistency</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">🌐</div>
+                        <div class="worker-name">翻译员</div>
+                        <div class="worker-skills">translation_engine</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📊</div>
+                        <div class="worker-name">数据分析师</div>
+                        <div class="worker-skills">pandas_analysis</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📑</div>
+                        <div class="worker-name">PPT制作</div>
+                        <div class="worker-skills">python_pptx</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📄</div>
+                        <div class="worker-name">Word文档</div>
+                        <div class="worker-skills">python_docx</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">🖥️</div>
+                        <div class="worker-name">浏览器</div>
+                        <div class="worker-skills">playwright_browser</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📧</div>
+                        <div class="worker-name">邮件处理</div>
+                        <div class="worker-skills">email_handler</div>
+                    </div>
+                    <div class="worker-card">
+                        <div class="worker-icon">📚</div>
+                        <div class="worker-name">技术文档</div>
+                        <div class="worker-skills">sphinx_doc</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-connector">▼<span class="label">ProgressReport 异步回写 + 产物存储</span></div>
+
+            <!-- Side Systems (Evaluator + Optimizer) -->
+            <div class="layer opc-layer">
+                <div class="layer-label">OPC-Hermes 旁系系统</div>
+                <div class="layer-title">
+                    🔬 质量评估 & 自动优化
+                    <span class="badge badge-new">OPC 新增</span>
+                </div>
+                <div class="components-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                    <div class="component" style="border-color: rgba(163, 113, 247, 0.3);">
+                        <div class="component-name" style="color: var(--opc-purple);">🔬 Evaluator Agent</div>
+                        <div class="component-desc">
+                            独立 Hermes Agent 实例，旁系异步评分<br>
+                            • worker_accuracy（Worker 输出准确性）<br>
+                            • worker_quality（Worker 输出质量）<br>
+                            • leader_decomposition（Leader 拆解质量）<br>
+                            • memory_rule_quality（记忆规则合理性）<br>
+                            读写 eval.db，只读 project.db
+                        </div>
+                    </div>
+                    <div class="component" style="border-color: rgba(210, 153, 34, 0.3);">
+                        <div class="component-name" style="color: var(--opc-warning);">⚡ Optimizer 引擎</div>
+                        <div class="component-desc">
+                            Cron 定时触发（通过 Hermes cron API 注册）<br>
+                            • 扫描 Eval Memory 发现质量下降/成本优化机会<br>
+                            • 生成优化提案 → 推送到 WebUI Dashboard<br>
+                            • 人工审批 → 手动切换<br>
+                            • 自动回滚：质量显著下降时告警
+                        </div>
+                    </div>
+                    <div class="component" style="border-color: rgba(45, 212, 191, 0.3);">
+                        <div class="component-name" style="color: var(--opc-teal);">📡 Knowledge Pipeline</div>
+                        <div class="component-desc">
+                            知识获取管道（Cron 24h 周期）<br>
+                            • 用户上传：解析文档/视频/URL<br>
+                            • 爬虫通道：定时爬取 → 去重清洗<br>
+                            • 质量评分 → 写入 Knowledge Base
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-connector">▼<span class="label">数据读写</span></div>
+
+            <!-- Storage Layer -->
+            <div class="layer" style="border-color: rgba(45, 212, 191, 0.3); background: rgba(45, 212, 191, 0.02);">
+                <div class="layer-label">共享存储</div>
+                <div class="layer-title">
+                    💾 三层门控记忆 + 共享存储
+                    <span class="badge badge-new">OPC 新增 (独立 SQLite)</span>
+                </div>
+                <div class="memory-layers">
+                    <div class="mem-block mem-project">
+                        <div class="mem-title" style="color: var(--opc-info);">📁 Project Memory</div>
+                        <ul class="mem-items">
+                            <li>project.db (SQLite + FTS5 + WAL)</li>
+                            <li>leader_task_memory 表</li>
+                            <li>worker_context 表</li>
+                            <li>summary_bridge 表</li>
+                            <li>command_queue 表 (WebUI→Leader)</li>
+                            <li>progress_report 表</li>
+                        </ul>
+                    </div>
+                    <div class="mem-block mem-eval">
+                        <div class="mem-title" style="color: var(--opc-purple);">📊 Eval Memory</div>
+                        <ul class="mem-items">
+                            <li>eval.db (独立 SQLite)</li>
+                            <li>Evaluator 评分记录</li>
+                            <li>质量趋势时间序列</li>
+                            <li>模型切换记录</li>
+                            <li>Optimizer 读取源</li>
+                        </ul>
+                    </div>
+                    <div class="mem-block mem-kb">
+                        <div class="mem-title" style="color: var(--opc-teal);">🧠 Knowledge Base</div>
+                        <ul class="mem-items">
+                            <li>knowledge.db (元数据)</li>
+                            <li>chromadb/ (向量索引)</li>
+                            <li>用户上传文档</li>
+                            <li>爬虫获取知识</li>
+                            <li>语义搜索支持</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="components-grid" style="margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="component">
+                        <div class="component-name">📋 Agent List</div>
+                        <div class="component-desc">workers.yaml + skills.yaml，全局注册表</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">📦 Artifact Store</div>
+                        <div class="component-desc">~/.hermes/opc/artifacts/{task_id}/</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">⚙️ Config</div>
+                        <div class="component-desc">~/.hermes/opc/config.yaml (独立加载)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">💰 Cost Tracker</div>
+                        <div class="component-desc">opc_cost.db (LLM 调用成本追踪)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-connector">▼<span class="label">复用底层运行时</span></div>
+
+            <!-- Hermes Agent Runtime -->
+            <div class="layer hermes-layer">
+                <div class="layer-label">Hermes Agent 运行时 (v0.15.1)</div>
+                <div class="layer-title">
+                    ⚙️ Hermes Agent 核心运行时
+                    <span class="badge badge-existing">不修改</span>
+                </div>
+                <div class="components-grid">
+                    <div class="component">
+                        <div class="component-name">🔄 AIAgent 核心循环</div>
+                        <div class="component-desc">run_agent.py (~12k LOC)，每个 Worker 复用此循环</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🔧 Tool Registry</div>
+                        <div class="component-desc">tools/registry.py，70+ 内置工具 + OPC 通过 Plugin 注册</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🔌 Plugin System</div>
+                        <div class="component-desc">hermes_cli/plugins.py，OPC 通过此系统注入工具/命令/Hook</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🤖 Provider Resolution</div>
+                        <div class="component-desc">20+ LLM 供应商适配 (Anthropic/OpenAI/Google/DeepSeek...)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">⏰ Cron Scheduler</div>
+                        <div class="component-desc">cron/scheduler.py，OPC Optimizer 通过 create_job() 注册</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">💬 Prompt Builder</div>
+                        <div class="component-desc">prompt_builder.py，OPC 通过 AGENTS.md / context 注入角色</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">📊 Session Store</div>
+                        <div class="component-desc">hermes_state.py (SQLite+FTS5)，Hermes 自身会话存储</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">🔨 Toolsets</div>
+                        <div class="component-desc">toolsets.py，OPC 通过 TOOLSETS.update() 运行时追加</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Integration Points -->
+        <h2 class="section-title">集成机制详解</h2>
+        <div class="layer" style="border-color: rgba(163, 113, 247, 0.3);">
+            <div class="layer-title">
+                🔌 OPC Plugin 启动流程（零侵入集成）
+                <span class="badge badge-plugin">Plugin 驱动</span>
+            </div>
+            <div class="dataflow">
+                <div class="dataflow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div class="step-title">Hermes Agent 启动</div>
+                        <div class="step-desc">扫描 plugins/ 目录 + pip entry_points → 发现 opc_hermes 插件</div>
+                    </div>
+                </div>
+                <div class="dataflow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div class="step-title">调用 opc_hermes/plugin.py: initialize(ctx)</div>
+                        <div class="step-desc">注册 OPC 工具：opc_save_context / opc_get_upstream_summaries / opc_write_to_bridge / opc_complexity_rate ...</div>
+                    </div>
+                </div>
+                <div class="dataflow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div class="step-title">运行时追加 TOOLSETS</div>
+                        <div class="step-desc">TOOLSETS.update({"opc_memory": ..., "opc_leader": ..., "opc_evaluator": ...}) — Python dict 可变性，不修改源文件</div>
+                    </div>
+                </div>
+                <div class="dataflow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div class="step-title">注册 Cron 定时任务</div>
+                        <div class="step-desc">create_job("opc_optimizer_scan", "1h") + create_job("opc_knowledge_crawl", "24h")</div>
+                    </div>
+                </div>
+                <div class="dataflow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div class="step-title">绑定 Gateway Hook</div>
+                        <div class="step-desc">pre_gateway_dispatch hook：判断任务复杂度 → 路由到 Leader 或正常 Agent</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAG Execution Flow -->
+        <h2 class="section-title">端到端数据流（DAG 执行）</h2>
+        <div class="layer">
+            <div class="dag-container">
+                <div class="dag-node dag-node-leader" style="min-width: 300px;">
+                    👑 Leader Agent<br><small style="color: var(--opc-text-muted);">意图解析 → 计划生成 → 用户确认 → DAG 调度</small>
+                </div>
+                <div class="dag-arrow">▼ <span class="dag-arrow-label">TaskProtocol 派发</span></div>
+                <div class="dag-row">
+                    <div class="dag-node dag-node-worker">🔍 研究员<br><small>web_search</small></div>
+                </div>
+                <div class="dag-arrow">▼ <span class="dag-arrow-label">summary_bridge 摘要传递</span></div>
+                <div class="dag-row">
+                    <div class="dag-node dag-node-worker">✍️ 写手A<br><small>ch.1-2</small></div>
+                    <div class="dag-node dag-node-worker">✍️ 写手B<br><small>ch.3-4</small></div>
+                    <div class="dag-node dag-node-worker">✍️ 写手C<br><small>ch.5-6</small></div>
+                </div>
+                <div class="dag-arrow">▼ <span class="dag-arrow-label">全部完成后汇聚</span></div>
+                <div class="dag-row">
+                    <div class="dag-node dag-node-worker">📝 审稿员<br><small>统稿 + 术语一致性</small></div>
+                </div>
+                <div class="dag-arrow">▼ <span class="dag-arrow-label">产物写入 Artifact Store</span></div>
+                <div class="dag-row">
+                    <div class="dag-node dag-node-storage">📦 最终产物交付用户</div>
+                    <div style="width: 40px;"></div>
+                    <div class="dag-node dag-node-eval">🔬 Evaluator<br><small>旁系异步评分</small></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WebUI Architecture -->
+        <h2 class="section-title">WebUI 架构（独立前端 + 后端）</h2>
+        <div class="layer opc-layer">
+            <div class="layer-title">
+                🌐 OPC-Hermes WebUI
+                <span class="badge badge-new">独立应用 (端口 9120)</span>
+            </div>
+            <div class="webui-layout">
+                <div class="webui-sidebar">
+                    <div style="font-weight: 600; margin-bottom: 12px; color: var(--opc-accent);">OPC · Hermes</div>
+                    <div class="webui-sidebar-item active">⚡ 仪表盘</div>
+                    <div class="webui-sidebar-item">🤖 Agents</div>
+                    <div class="webui-sidebar-item">📋 任务</div>
+                    <div class="webui-sidebar-item">📦 产物</div>
+                    <div class="webui-sidebar-item">📊 评估</div>
+                    <div class="webui-sidebar-item">🔧 配置</div>
+                    <div style="margin-top: 24px; font-size: 0.72rem; color: var(--opc-text-muted);">
+                        Worker 状态: 8 在线<br>
+                        Leader 心跳: ● 正常
+                    </div>
+                </div>
+                <div class="webui-main">
+                    <div style="font-weight: 600; margin-bottom: 12px;">页面功能模块</div>
+                    <div class="webui-pages">
+                        <div class="webui-page">
+                            <div class="webui-page-title">/ Dashboard</div>
+                            <div class="webui-page-desc">活跃任务数、在线 Worker、质量分、最近任务列表、Agent 概览、质量趋势图</div>
+                        </div>
+                        <div class="webui-page">
+                            <div class="webui-page-title">/agents</div>
+                            <div class="webui-page-desc">Agent List 浏览/搜索/详情，能力卡片，评分历史，Skill 绑定管理</div>
+                        </div>
+                        <div class="webui-page">
+                            <div class="webui-page-title">/tasks</div>
+                            <div class="webui-page-desc">新建任务向导、DAG 计划预览 (React Flow)、WebSocket 实时进度、执行监控</div>
+                        </div>
+                        <div class="webui-page">
+                            <div class="webui-page-title">/artifacts</div>
+                            <div class="webui-page-desc">产物目录树浏览、文件预览、版本历史、下载管理</div>
+                        </div>
+                        <div class="webui-page">
+                            <div class="webui-page-title">/evaluations</div>
+                            <div class="webui-page-desc">质量趋势图 (Observable Plot)、维度评分分布、评估记录表</div>
+                        </div>
+                        <div class="webui-page">
+                            <div class="webui-page-title">/settings</div>
+                            <div class="webui-page-desc">OPC 配置编辑器：通用/模型偏好/Evaluator/Optimizer/工作流</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 16px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 0.78rem;">
+                        <strong>数据访问方式：</strong>
+                        读操作 → 直读 SQLite (WAL 模式) / YAML 文件 |
+                        写操作 → INSERT command_queue → Leader 轮询执行 |
+                        实时推送 → WebSocket + aiosqlite 轮询
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <h2 class="section-title">技术栈</h2>
+        <div class="tech-grid">
+            <div class="tech-category">
+                <div class="tech-category-title">前端 (WebUI)</div>
+                <div class="tech-item"><span class="tech-name">React 18 + TypeScript</span><span class="tech-role">UI 框架</span></div>
+                <div class="tech-item"><span class="tech-name">Vite 6</span><span class="tech-role">构建工具</span></div>
+                <div class="tech-item"><span class="tech-name">Tailwind CSS v4</span><span class="tech-role">样式</span></div>
+                <div class="tech-item"><span class="tech-name">React Flow (@xyflow)</span><span class="tech-role">DAG 可视化</span></div>
+                <div class="tech-item"><span class="tech-name">@observablehq/plot</span><span class="tech-role">评估图表</span></div>
+                <div class="tech-item"><span class="tech-name">react-router-dom v7</span><span class="tech-role">路由</span></div>
+                <div class="tech-item"><span class="tech-name">lucide-react</span><span class="tech-role">图标</span></div>
+                <div class="tech-item"><span class="tech-name">motion (framer)</span><span class="tech-role">动效</span></div>
+            </div>
+            <div class="tech-category">
+                <div class="tech-category-title">后端 (FastAPI)</div>
+                <div class="tech-item"><span class="tech-name">FastAPI</span><span class="tech-role">API 框架 (9120)</span></div>
+                <div class="tech-item"><span class="tech-name">uvicorn</span><span class="tech-role">ASGI 服务器</span></div>
+                <div class="tech-item"><span class="tech-name">SQLite + WAL</span><span class="tech-role">数据存储</span></div>
+                <div class="tech-item"><span class="tech-name">aiosqlite</span><span class="tech-role">异步 DB 访问</span></div>
+                <div class="tech-item"><span class="tech-name">ChromaDB</span><span class="tech-role">向量语义搜索</span></div>
+                <div class="tech-item"><span class="tech-name">WebSocket</span><span class="tech-role">实时推送</span></div>
+                <div class="tech-item"><span class="tech-name">PyYAML</span><span class="tech-role">配置解析</span></div>
+                <div class="tech-item"><span class="tech-name">GitPython</span><span class="tech-role">版本管理</span></div>
+            </div>
+            <div class="tech-category">
+                <div class="tech-category-title">核心 Python 包 (opc_hermes/)</div>
+                <div class="tech-item"><span class="tech-name">leader_agent.py</span><span class="tech-role">调度中枢</span></div>
+                <div class="tech-item"><span class="tech-name">complexity_rater.py</span><span class="tech-role">复杂度 Skill</span></div>
+                <div class="tech-item"><span class="tech-name">memory_layer/</span><span class="tech-role">门控记忆</span></div>
+                <div class="tech-item"><span class="tech-name">evaluator.py</span><span class="tech-role">质量评估</span></div>
+                <div class="tech-item"><span class="tech-name">optimizer.py</span><span class="tech-role">自动优化</span></div>
+                <div class="tech-item"><span class="tech-name">workflow/</span><span class="tech-role">DAG 编排</span></div>
+                <div class="tech-item"><span class="tech-name">knowledge_pipeline.py</span><span class="tech-role">知识管道</span></div>
+                <div class="tech-item"><span class="tech-name">plugin.py</span><span class="tech-role">Plugin 入口</span></div>
+            </div>
+            <div class="tech-category">
+                <div class="tech-category-title">模型能力矩阵</div>
+                <div class="tech-item"><span class="tech-name">Claude Sonnet 4</span><span class="tech-role">主力 COMPLEX</span></div>
+                <div class="tech-item"><span class="tech-name">GPT-4o</span><span class="tech-role">备选多模态</span></div>
+                <div class="tech-item"><span class="tech-name">GPT-4o-mini</span><span class="tech-role">轻量 SIMPLE</span></div>
+                <div class="tech-item"><span class="tech-name">Gemini 2.5 Flash</span><span class="tech-role">超长上下文</span></div>
+                <div class="tech-item"><span class="tech-name">DeepSeek V3</span><span class="tech-role">纯文本推理</span></div>
+                <div class="tech-item"><span class="tech-name">MiniCPM-V 4.6</span><span class="tech-role">本地免费</span></div>
+            </div>
+        </div>
+
+        <!-- File Structure -->
+        <h2 class="section-title">项目文件结构</h2>
+        <div class="layer">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--opc-accent);">opc_hermes/ (新增包)</div>
+                    <pre style="font-size: 0.75rem; color: var(--opc-text-muted); line-height: 1.6; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto;">
+opc_hermes/
+├── __init__.py
+├── plugin.py               ← Plugin 入口 (initialize)
+├── leader_agent.py         ← Leader 调度中枢
+├── complexity_rater.py     ← 复杂度评级 Skill
+├── evaluator.py            ← Evaluator Agent
+├── optimizer.py            ← 自动优化引擎
+├── knowledge_pipeline.py   ← 知识获取管道
+├── revision_handler.py     ← 修订/反馈处理
+├── model_prefs.py          ← 模型三层优先级
+├── toolsets.py             ← OPC 专属工具集
+├── agent_list/
+│   ├── registry.py         ← Agent + Skill 全局注册
+│   └── defaults.yaml       ← 系统默认定义
+├── memory_layer/
+│   ├── gated_memory.py     ← GatedMemoryLayer
+│   ├── tools.py            ← 记忆工具 (opc_前缀)
+│   ├── task_protocol.py    ← 数据结构
+│   └── summary_bridge.py   ← 摘要交换
+├── workflow/
+│   ├── dag_executor.py     ← DAG 编排器
+│   ├── cycle_detector.py   ← 循环依赖检测
+│   ├── fault_handler.py    ← 故障处理
+│   ├── recovery.py         ← 中断恢复
+│   └── artifact_manager.py ← 产物管理
+├── webui/                  ← React + FastAPI
+│   ├── server.py           ← FastAPI 入口
+│   ├── routes/             ← API 路由
+│   └── src/                ← React 前端
+├── cli_skin/               ← CLI 扩展命令
+└── config/                 ← 配置模板</pre>
+                </div>
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--opc-info);">~/.hermes/opc/ (运行时数据)</div>
+                    <pre style="font-size: 0.75rem; color: var(--opc-text-muted); line-height: 1.6; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto;">
+~/.hermes/opc/
+├── config.yaml             ← OPC 主配置
+├── agent_list/
+│   ├── defaults.yaml       ← 系统默认 Agent/Skill
+│   └── workers.yaml        ← 用户自定义 Worker
+├── memory/
+│   ├── project.db          ← Project Memory (WAL)
+│   ├── eval.db             ← Eval Memory
+│   ├── knowledge.db        ← KB 元数据
+│   ├── opc_cost.db         ← LLM 成本追踪
+│   └── migrations/         ← Schema 迁移
+├── gitops/
+│   └── agents/             ← Agent 版本仓库
+├── artifact_store/
+│   └── {task_id}/          ← 产物存储
+├── models/
+│   └── capability_matrix.yaml
+└── logs/
+    ├── opc_webui.log
+    ├── opc_leader.log
+    ├── opc_workers.log
+    └── opc_cron.log</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Endpoints -->
+        <h2 class="section-title">WebUI 后端 API 端点</h2>
+        <div class="layer">
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--opc-border);">
+                            <th style="padding: 8px 12px; text-align: left; color: var(--opc-accent);">Method</th>
+                            <th style="padding: 8px 12px; text-align: left; color: var(--opc-accent);">Path</th>
+                            <th style="padding: 8px 12px; text-align: left; color: var(--opc-accent);">说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/dashboard</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">仪表盘聚合数据</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/agents</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">Agent List（支持搜索/能力/评分过滤）</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/agents/{id}</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">Agent 详情（含评分历史、最近任务）</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-warning);">POST</td><td style="padding: 6px 12px;">/api/opc/tasks</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">创建新任务（触发 Leader 规划）</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/tasks</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">任务列表（支持状态过滤）</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/tasks/{id}</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">任务详情（含 DAG 结构、Worker 状态）</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-warning);">POST</td><td style="padding: 6px 12px;">/api/opc/tasks/{id}/confirm</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">确认/修改/取消计划</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-purple);">WS</td><td style="padding: 6px 12px;">/api/opc/tasks/{id}/ws</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">WebSocket 实时推送 Worker 状态</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/artifacts</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">产物列表</td></tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding: 6px 12px; color: var(--opc-success);">GET</td><td style="padding: 6px 12px;">/api/opc/evaluations</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">评估记录 + 趋势数据</td></tr>
+                        <tr><td style="padding: 6px 12px; color: var(--opc-info);">PUT</td><td style="padding: 6px 12px;">/api/opc/settings</td><td style="padding: 6px 12px; color: var(--opc-text-muted);">更新 OPC 配置</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Deployment -->
+        <h2 class="section-title">部署架构</h2>
+        <div class="layer">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                <div class="component" style="border-color: rgba(212, 168, 83, 0.3);">
+                    <div class="component-name" style="color: var(--opc-accent);">🖥️ 进程 1: Hermes Agent</div>
+                    <div class="component-desc">
+                        核心 Agent 运行时<br>
+                        • AIAgent 核心循环<br>
+                        • Gateway (22 平台)<br>
+                        • Plugin System (含 OPC Plugin)<br>
+                        • Tool Registry (含 OPC 工具)<br>
+                        • Cron Scheduler<br>
+                        • Web Dashboard (端口 9119)
+                    </div>
+                </div>
+                <div class="component" style="border-color: rgba(63, 185, 80, 0.3);">
+                    <div class="component-name" style="color: var(--opc-success);">🌐 进程 2: OPC WebUI</div>
+                    <div class="component-desc">
+                        独立 FastAPI 应用 (端口 9120)<br>
+                        • React 前端 (Vite 打包)<br>
+                        • RESTful API<br>
+                        • WebSocket 实时推送<br>
+                        • 直读 SQLite (WAL 模式)<br>
+                        • command_queue → Leader 轮询
+                    </div>
+                </div>
+                <div class="component" style="border-color: rgba(163, 113, 247, 0.3);">
+                    <div class="component-name" style="color: var(--opc-purple);">🤖 进程 N: Worker Agents</div>
+                    <div class="component-desc">
+                        每个 Worker = 独立 subprocess<br>
+                        • 标准 Hermes Agent 实例<br>
+                        • 独立会话 + 工具集<br>
+                        • 通过 TaskProtocol 接收任务<br>
+                        • 通过 ProgressReport 回报<br>
+                        • 300s tool call 硬超时
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 16px; padding: 12px; background: rgba(212, 168, 83, 0.05); border: 1px solid rgba(212, 168, 83, 0.2); border-radius: 6px; font-size: 0.8rem;">
+                <strong style="color: var(--opc-accent);">关键约束：</strong>
+                <span style="color: var(--opc-text-muted);">
+                    所有进程通过 SQLite WAL 模式共享数据文件（读写不互斥）。
+                    OPC WebUI 完全不依赖 Hermes 9119 端口，零耦合。
+                    Tool call 硬超时 300 秒，Worker 执行必须拆分为多步调用。
+                </span>
+            </div>
+        </div>
+
+        <div class="footer">
+            OPC-Hermes v3.0 架构设计 · 仓库: github.com/334250/OPC-Hermes · 基于 Hermes Agent v0.15.1
+        </div>
+    </div>
+</body>
+</html>

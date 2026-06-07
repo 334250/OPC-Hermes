@@ -1,0 +1,488 @@
+# ══════════════════════════════════════════════════════════════════════════
+# OPC-Hermes System Default Workers & Skills
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Shipped with the opc_hermes package.  User registrations in
+# ~/.hermes/opc/agent_list/{workers,skills}.yaml overlay these defaults.
+#
+# Design references:
+#   - §4.3 Agent 角色完整清单 (opc-hermes-design-v3.0.md)
+#   - §二-B Skills 总表 (opc-hermes-integration.md)
+
+# ── Skills ───────────────────────────────────────────────────────────────
+# Each skill is a reusable capability with an owner worker and I/O contract.
+
+skills:
+  # ── Research skills ────────────────────────────────────────────────────
+  - id: web_search
+    display_name: 网页搜索
+    description: 搜索引擎查询 + 结果提取 + 结构化摘要
+    owner_worker_id: researcher
+    tags: [search, research, web, information]
+    input_schema: {query: "搜索关键词或问题"}
+    output_schema: {results: "结构化搜索结果列表", source_urls: "来源 URL 列表"}
+
+  - id: paper_fetch
+    display_name: 论文检索
+    description: arXiv/Semantic Scholar 学术文献检索
+    owner_worker_id: researcher
+    tags: [academic, research, papers, arxiv]
+    input_schema: {query: "论文标题/关键词/DOI"}
+    output_schema: {abstract: "摘要", citations: "引用信息", pdf_url: "PDF 链接"}
+
+  # ── Writing skills ─────────────────────────────────────────────────────
+  - id: chapter_writing
+    display_name: 章节撰写
+    description: 结构化技术章节写作（大纲→正文）
+    owner_worker_id: writer
+    tags: [writing, documentation, chapters]
+    input_schema: {outline: "章节大纲", upstream_summary: "上游 Worker 摘要"}
+    output_schema: {content: "Markdown 章节正文"}
+
+  - id: markdown_format
+    display_name: Markdown 排版
+    description: 格式化、目录生成、引用管理
+    owner_worker_id: formatter
+    tags: [formatting, markdown, toc, references]
+    input_schema: {raw_markdown: "原始 Markdown 文本"}
+    output_schema: {formatted: "格式化后 Markdown"}
+
+  - id: grammar_check
+    display_name: 语法检查
+    description: 中英文语法/拼写/标点检查
+    owner_worker_id: reviewer
+    tags: [review, grammar, spelling, proofreading]
+    input_schema: {text: "待审文本"}
+    output_schema: {errors: "错误列表", suggestions: "修正建议"}
+
+  - id: consistency_review
+    display_name: 一致性审查
+    description: 术语一致性、风格一致性、引用完整性
+    owner_worker_id: reviewer
+    tags: [review, consistency, terminology, style]
+    input_schema: {document: "完整文档"}
+    output_schema: {issues: "不一致项列表"}
+
+  # ── Visualization skills ───────────────────────────────────────────────
+  - id: flowchart_draw
+    display_name: 流程图绘制
+    description: Mermaid/Draw.io 流程图、架构图生成
+    owner_worker_id: illustrator
+    tags: [diagram, flowchart, architecture, mermaid, drawio]
+    input_schema: {spec: "图表需求描述"}
+    output_schema: {file: ".mmd / .drawio 文件路径"}
+
+  - id: data_chart
+    display_name: 数据图表
+    description: ECharts/Matplotlib 数据可视化
+    owner_worker_id: illustrator
+    tags: [chart, data, visualization, echarts, matplotlib]
+    input_schema: {data: "结构化数据", chart_type: "图表类型"}
+    output_schema: {file: ".png / .html 图表路径"}
+
+  - id: draw_io_advanced
+    display_name: Draw.io 高级图表
+    description: 高质量矢量架构图生成（python-drawio）
+    owner_worker_id: illustrator
+    tags: [diagram, drawio, vector, architecture]
+    input_schema: {spec: "图表规格描述"}
+    output_schema: {file: ".drawio 矢量图路径"}
+
+  - id: echarts_interactive
+    display_name: ECharts 交互图表
+    description: 交互式数据图表生成
+    owner_worker_id: illustrator
+    tags: [chart, interactive, echarts, html]
+    input_schema: {data: "数据", config: "图表配置"}
+    output_schema: {file: ".html 交互图表路径"}
+
+  # ── Document production skills ─────────────────────────────────────────
+  - id: python_pptx
+    display_name: PPT 生成
+    description: python-pptx 演示文稿创建和编辑
+    owner_worker_id: ppt_maker
+    tags: [ppt, presentation, powerpoint]
+    input_schema: {outline: "Markdown 大纲", assets: "素材路径列表"}
+    output_schema: {file: ".pptx 文件路径"}
+
+  - id: python_docx
+    display_name: Word 生成
+    description: python-docx 文档创建和编辑
+    owner_worker_id: doc_maker
+    tags: [word, document, docx]
+    input_schema: {content: "Markdown 正文", template: "模板路径"}
+    output_schema: {file: ".docx 文件路径"}
+
+  - id: sphinx_doc
+    display_name: Sphinx 文档
+    description: API 文档自动生成（Sphinx/rST）
+    owner_worker_id: doc_maker
+    tags: [documentation, api, sphinx, restructuredtext]
+    input_schema: {source_path: "Python 源码路径"}
+    output_schema: {html_dir: "HTML 输出目录"}
+
+  - id: pandoc_convert
+    display_name: Pandoc 转换
+    description: 多格式文档互转（md↔docx↔pdf↔html）
+    owner_worker_id: doc_maker
+    tags: [conversion, pandoc, format]
+    input_schema: {source: "源文件路径", target_format: "目标格式"}
+    output_schema: {file: "转换后文件路径"}
+
+  # ── Data skills ────────────────────────────────────────────────────────
+  - id: pandas_analysis
+    display_name: 数据分析
+    description: Pandas/Scipy/DuckDB 数据清洗和分析
+    owner_worker_id: data_analyst
+    tags: [data, analysis, pandas, statistics]
+    input_schema: {data_path: "数据文件路径", requirements: "分析需求"}
+    output_schema: {report: "分析报告 (JSON/Markdown)"}
+
+  # ── Translation skill ──────────────────────────────────────────────────
+  - id: translation_engine
+    display_name: 翻译引擎
+    description: 50+ 语言对翻译，支持领域术语表
+    owner_worker_id: translator
+    tags: [translation, i18n, multilingual]
+    input_schema: {source: "源文本", target_lang: "目标语言"}
+    output_schema: {translated: "翻译后文本"}
+
+  # ── Browser automation ─────────────────────────────────────────────────
+  - id: playwright_browser
+    display_name: 浏览器自动化
+    description: Playwright 浏览器操作（表单/抓取/截图）
+    owner_worker_id: browser_agent
+    tags: [browser, automation, scraping, playwright]
+    input_schema: {instructions: "操作指令"}
+    output_schema: {content: "页面内容", screenshot: "截图路径"}
+
+  # ── Email handling ─────────────────────────────────────────────────────
+  - id: email_handler
+    display_name: 邮件处理
+    description: IMAP/SMTP 邮件收发、分类、附件处理
+    owner_worker_id: email_agent
+    tags: [email, communication, imap, smtp]
+    input_schema: {operation: "邮件操作指令"}
+    output_schema: {result: "邮件列表/发送确认"}
+
+  # ── Software development skills ────────────────────────────────────────
+  - id: requirements_analysis
+    display_name: 需求分析
+    description: 将用户目标、约束和验收标准整理成可执行开发任务
+    owner_worker_id: product_engineer
+    tags: [requirements, product, planning, acceptance-criteria]
+    input_schema: {brief: "用户目标/业务背景/约束"}
+    output_schema: {spec: "需求规格", acceptance_criteria: "验收标准列表"}
+
+  - id: system_design
+    display_name: 系统设计
+    description: 架构拆解、模块边界、接口契约和关键技术方案设计
+    owner_worker_id: software_architect
+    tags: [architecture, design, interfaces, adr]
+    input_schema: {requirements: "需求规格", codebase_summary: "代码库摘要"}
+    output_schema: {design_doc: "设计文档", implementation_plan: "开发计划"}
+
+  - id: backend_implementation
+    display_name: 后端实现
+    description: 服务端业务逻辑、API、数据模型和集成代码实现
+    owner_worker_id: backend_engineer
+    tags: [backend, api, database, implementation, python]
+    input_schema: {design_doc: "设计文档", task: "后端开发任务"}
+    output_schema: {changed_files: "变更文件列表", notes: "实现说明"}
+
+  - id: frontend_implementation
+    display_name: 前端实现
+    description: UI、状态管理、交互流程和前端集成实现
+    owner_worker_id: frontend_engineer
+    tags: [frontend, ui, react, accessibility, implementation]
+    input_schema: {design_doc: "设计文档", task: "前端开发任务"}
+    output_schema: {changed_files: "变更文件列表", notes: "实现说明"}
+
+  - id: test_automation
+    display_name: 自动化测试
+    description: 单元测试、集成测试、端到端测试和回归验证
+    owner_worker_id: qa_engineer
+    tags: [testing, pytest, e2e, regression, quality]
+    input_schema: {changed_files: "变更文件列表", acceptance_criteria: "验收标准"}
+    output_schema: {test_files: "测试文件列表", verification: "验证结果"}
+
+  - id: devops_delivery
+    display_name: DevOps 交付
+    description: 构建、CI/CD、部署配置、运行脚本和可观测性检查
+    owner_worker_id: devops_engineer
+    tags: [devops, ci-cd, deployment, build, observability]
+    input_schema: {service: "服务/模块", delivery_goal: "交付目标"}
+    output_schema: {config_changes: "配置变更", runbook: "运行说明"}
+
+  - id: code_review
+    display_name: 代码审查
+    description: 针对正确性、可维护性、测试覆盖和回归风险进行代码审查
+    owner_worker_id: code_reviewer
+    tags: [code-review, maintainability, regression, quality]
+    input_schema: {diff: "代码变更", context: "相关需求/设计"}
+    output_schema: {findings: "问题列表", residual_risk: "剩余风险"}
+
+  - id: security_audit
+    display_name: 安全审计
+    description: 权限、输入校验、密钥处理、依赖和高风险操作审查
+    owner_worker_id: security_engineer
+    tags: [security, threat-modeling, auth, secrets, dependencies]
+    input_schema: {scope: "审计范围", artifacts: "代码/配置/依赖信息"}
+    output_schema: {risks: "风险列表", mitigations: "修复建议"}
+
+# ── Workers ───────────────────────────────────────────────────────────────
+# Each worker is a role-specialized agent with skills, model preferences,
+# and toolset restrictions.
+
+workers:
+  # ── Leader (Orchestrator) ──────────────────────────────────────────────
+  - id: leader
+    display_name: Leader Agent
+    description: 任务调度中枢 — 接收用户请求、拆解子任务、匹配 Worker、汇总结果
+    role: leader
+    capabilities: [task_decomposition, worker_matching, plan_generation, result_aggregation]
+    skill_ids: []
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, opc-leader]
+    system_prompt_template: leader
+
+  # ── Research ───────────────────────────────────────────────────────────
+  - id: researcher
+    display_name: 调研 Agent
+    description: 信息检索与结构化摘要 — 网页搜索、论文检索、数据收集
+    role: worker
+    capabilities: [web_research, academic_search, information_synthesis, data_collection]
+    skill_ids: [web_search, paper_fetch]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, web, search]
+    system_prompt_template: researcher
+
+  # ── Writing ────────────────────────────────────────────────────────────
+  - id: writer
+    display_name: 撰写 Agent
+    description: 结构化写作与内容创作 — 章节撰写、故事叙述、报告生成
+    role: worker
+    capabilities: [chapter_writing, content_creation, report_writing, creative_writing]
+    skill_ids: [chapter_writing]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file]
+    system_prompt_template: writer
+
+  # ── Illustration ───────────────────────────────────────────────────────
+  - id: illustrator
+    display_name: 画图 Agent
+    description: 可视化与图表生成 — 流程图、数据图表、架构图
+    role: worker
+    capabilities: [flowchart_drawing, data_charting, architecture_diagram, infographic]
+    skill_ids: [flowchart_draw, data_chart, draw_io_advanced, echarts_interactive]
+    default_model: gemini-2.5-flash
+    model_tier: budget
+    toolsets: [opc-core, file, terminal, image_gen]
+    system_prompt_template: illustrator
+
+  # ── PPT ────────────────────────────────────────────────────────────────
+  - id: ppt_maker
+    display_name: PPT 制作 Agent
+    description: 演示文稿创建与编辑 — 基于 python-pptx 的自动化 PPT 制作
+    role: worker
+    capabilities: [ppt_generation, slide_design, presentation_creation]
+    skill_ids: [python_pptx]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, terminal]
+    system_prompt_template: ppt_maker
+
+  # ── Word Document ──────────────────────────────────────────────────────
+  - id: doc_maker
+    display_name: 文档制作 Agent
+    description: Word/PDF 文档创建 — python-docx、Sphinx、Pandoc 多格式转换
+    role: worker
+    capabilities: [document_generation, format_conversion, api_documentation]
+    skill_ids: [python_docx, sphinx_doc, pandoc_convert]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, terminal]
+    system_prompt_template: doc_maker
+
+  # ── Formatting ─────────────────────────────────────────────────────────
+  - id: formatter
+    display_name: 排版 Agent
+    description: 文档格式化与排版 — Markdown 美化、目录生成、引用管理
+    role: worker
+    capabilities: [markdown_formatting, toc_generation, reference_management]
+    skill_ids: [markdown_format]
+    default_model: gpt-4o-mini
+    model_tier: budget
+    toolsets: [opc-core, file]
+    system_prompt_template: formatter
+
+  # ── Review ─────────────────────────────────────────────────────────────
+  - id: reviewer
+    display_name: 审稿 Agent
+    description: 质量审查与校对 — 语法检查、术语一致性、风格审查
+    role: worker
+    capabilities: [grammar_check, consistency_review, style_review, proofreading]
+    skill_ids: [grammar_check, consistency_review]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, vision]
+    system_prompt_template: reviewer
+
+  # ── Data Analysis ──────────────────────────────────────────────────────
+  - id: data_analyst
+    display_name: 数据分析 Agent
+    description: 数据清洗与分析 — Pandas/Scipy/DuckDB 数据处理
+    role: worker
+    capabilities: [data_analysis, statistics, data_cleaning, report_generation]
+    skill_ids: [pandas_analysis]
+    default_model: deepseek-v3
+    model_tier: standard
+    toolsets: [opc-core, terminal, file]
+    system_prompt_template: data_analyst
+
+  # ── Translation ────────────────────────────────────────────────────────
+  - id: translator
+    display_name: 翻译 Agent
+    description: 多语言翻译 — 50+ 语言对，支持领域术语表
+    role: worker
+    capabilities: [translation, localization, multilingual]
+    skill_ids: [translation_engine]
+    default_model: gpt-4o-mini
+    model_tier: budget
+    toolsets: [opc-core, file]
+    system_prompt_template: translator
+
+  # ── Browser ────────────────────────────────────────────────────────────
+  - id: browser_agent
+    display_name: 浏览器 Agent
+    description: 网页自动化与抓取 — Playwright 驱动的浏览器操作
+    role: worker
+    capabilities: [browser_automation, web_scraping, form_filling, screenshot]
+    skill_ids: [playwright_browser]
+    default_model: gemini-2.5-flash
+    model_tier: budget
+    toolsets: [opc-core, browser]
+    system_prompt_template: browser_agent
+
+  # ── Email ──────────────────────────────────────────────────────────────
+  - id: email_agent
+    display_name: 邮件 Agent
+    description: 邮件收发与分类 — IMAP/SMTP 邮件自动化处理
+    role: worker
+    capabilities: [email_sending, email_reading, attachment_handling, email_classification]
+    skill_ids: [email_handler]
+    default_model: gpt-4o-mini
+    model_tier: budget
+    toolsets: [opc-core]
+    system_prompt_template: email_agent
+
+  # ── Product / Requirements ────────────────────────────────────────────
+  - id: product_engineer
+    display_name: 产品需求 Agent
+    description: 开发入口角色 — 澄清目标、拆验收标准、切分可执行开发任务
+    role: worker
+    capabilities: [requirements_analysis, acceptance_criteria, task_slicing, product_planning]
+    skill_ids: [requirements_analysis]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, web]
+    system_prompt_template: product_engineer
+
+  # ── Architecture ──────────────────────────────────────────────────────
+  - id: software_architect
+    display_name: 软件架构 Agent
+    description: 架构与技术方案 — 模块边界、接口契约、数据流、实施计划
+    role: worker
+    capabilities: [system_design, architecture_review, api_design, technical_planning]
+    skill_ids: [system_design]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, web]
+    system_prompt_template: software_architect
+
+  # ── Backend Engineering ───────────────────────────────────────────────
+  - id: backend_engineer
+    display_name: 后端开发 Agent
+    description: 后端实现 — API、业务逻辑、数据模型、集成和服务端测试
+    role: worker
+    capabilities: [backend_implementation, api_development, data_modeling, integration]
+    skill_ids: [backend_implementation]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, terminal, debugging]
+    system_prompt_template: backend_engineer
+
+  # ── Frontend Engineering ──────────────────────────────────────────────
+  - id: frontend_engineer
+    display_name: 前端开发 Agent
+    description: 前端实现 — UI、交互、状态管理、可访问性和浏览器验证
+    role: worker
+    capabilities: [frontend_implementation, ui_development, accessibility, browser_validation]
+    skill_ids: [frontend_implementation]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, terminal, browser, vision]
+    system_prompt_template: frontend_engineer
+
+  # ── QA Engineering ────────────────────────────────────────────────────
+  - id: qa_engineer
+    display_name: 测试 Agent
+    description: 测试与验证 — 单元/集成/E2E 测试、回归检查、验收验证
+    role: worker
+    capabilities: [test_automation, regression_testing, acceptance_validation, quality_gates]
+    skill_ids: [test_automation]
+    default_model: gpt-4o
+    model_tier: standard
+    toolsets: [opc-core, file, terminal, browser, debugging]
+    system_prompt_template: qa_engineer
+
+  # ── DevOps Engineering ────────────────────────────────────────────────
+  - id: devops_engineer
+    display_name: DevOps Agent
+    description: 构建与交付 — CI/CD、部署配置、运行脚本、环境诊断
+    role: worker
+    capabilities: [devops_delivery, ci_cd, deployment, build_pipeline, environment_diagnostics]
+    skill_ids: [devops_delivery]
+    default_model: deepseek-v3
+    model_tier: standard
+    toolsets: [opc-core, file, terminal, debugging]
+    system_prompt_template: devops_engineer
+
+  # ── Code Review ───────────────────────────────────────────────────────
+  - id: code_reviewer
+    display_name: 代码审查 Agent
+    description: 代码审查 — 正确性、回归风险、维护性、测试缺口
+    role: worker
+    capabilities: [code_review, regression_risk_review, maintainability_review, test_gap_analysis]
+    skill_ids: [code_review]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, debugging]
+    system_prompt_template: code_reviewer
+
+  # ── Security Engineering ──────────────────────────────────────────────
+  - id: security_engineer
+    display_name: 安全审计 Agent
+    description: 安全审查 — 权限、输入校验、密钥、依赖和高风险操作
+    role: worker
+    capabilities: [security_audit, threat_modeling, auth_review, secret_handling, dependency_risk]
+    skill_ids: [security_audit]
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, file, terminal, web]
+    system_prompt_template: security_engineer
+
+  # ── Evaluator (quality assessment) ─────────────────────────────────────
+  - id: evaluator
+    display_name: 评估 Agent
+    description: 质量评估 — 对每个 Worker 的输入/输出质量打分，对 Leader 拆解质量评分
+    role: evaluator
+    capabilities: [quality_scoring, input_output_evaluation, leader_decomposition_review]
+    skill_ids: []
+    default_model: claude-sonnet-4
+    model_tier: standard
+    toolsets: [opc-core, opc-evaluator, file]
+    system_prompt_template: evaluator

@@ -1,0 +1,14 @@
+# OPC-Hermes additional Python dependencies
+#
+# Most dependencies are satisfied by Hermes Agent (sqlite3, rich,
+# prompt_toolkit, yaml, etc.).  Listed here: only OPC-specific additions.
+
+# Vector index for Knowledge Base semantic search
+chromadb>=0.4.0,<0.7
+
+# Agent List configuration parsing (yaml is already in Hermes core)
+# pyyaml — already satisfied by Hermes Agent
+
+# WebUI (Phase 4)
+# fastapi — already in Hermes [web] extra
+# uvicorn — already in Hermes [web] extra

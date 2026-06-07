@@ -187,6 +187,469 @@ OPC-Hermes: "帮我画个架构图"
 | `code_reviewer` | 正确性、回归风险、维护性审查 | 问题列表 |
 | `security_engineer` | 权限、输入校验、密钥、依赖审查 | 风险列表 |
 
+### 3.5 智能体管理面板（Agent Manager）
+
+智能体管理面板是 WebUI 中用于**增删改查智能体、分组管理、搭建专用流水线**的核心管理页面。用户可在此：
+- 浏览/搜索/筛选所有已注册的 Worker Agent
+- 创建新的 Worker（定义角色、Skills、模型、工具集）
+- 编辑已有 Worker 的配置
+- 将多个 Worker 组合为**智能体组（Agent Group）**
+- 基于 Agent Group 搭建**专用流水线模板（Pipeline Template）**
+
+#### 3.5.1 页面布局
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  智能体管理面板                                    [+ 新建智能体] [刷新] │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─ 工具栏 ─────────────────────────────────────────────────────┐    │
+│  │ 🔍 搜索智能体...  │ [全部] [Leader] [Worker] [Evaluator]   │    │
+│  │                  │ [通用内容] [软件开发] [自定义]            │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌─ 左侧: 智能体列表 ──── 中间: 编辑面板 ──── 右侧: 预览 ────────┐   │
+│  │                                                               │   │
+│  │ ┌─ 智能体列表 ─────────┐  ┌─ 编辑面板 ──────────────────┐    │   │
+│  │ │                      │  │                               │    │   │
+│  │ │ 🔍 researcher       │  │  智能体详情: researcher        │    │   │
+│  │ │    调研 Agent        │  │                               │    │   │
+│  │ │    ⭐ 0.85 · standard│  │  显示名称: [调研 Agent      ] │    │   │
+│  │ │                      │  │  Worker ID: researcher        │    │   │
+│  │ │ ✍️ writer            │  │  角色:      [Worker      ▾]  │    │   │
+│  │ │    撰写 Agent        │  │  模型层:    [standard    ▾]  │    │   │
+│  │ │    ⭐ 0.72 · standard│  │  默认模型: [claude-sonnet-4]  │    │   │
+│  │ │                      │  │                               │    │   │
+│  │ │ 🎨 illustrator       │  │  Skills:                      │    │   │
+│  │ │    画图 Agent        │  │  ┌──────────────────────┐    │    │   │
+│  │ │    ⭐ 0.75 · budget  │  │  │ flowchart_draw    [✕]│    │    │   │
+│  │ │                      │  │  │ data_chart        [✕]│    │    │   │
+│  │ │ 📊 data_analyst      │  │  │ draw_io_advanced  [✕]│    │    │   │
+│  │ │    数据分析 Agent     │  │  │ [+ 添加 Skill]      │    │    │   │
+│  │ │    ⭐ 0.68 · standard│  │  └──────────────────────┘    │    │   │
+│  │ │                      │  │                               │    │   │
+│  │ │ ... (更多智能体)      │  │  Toolsets:                    │    │   │
+│  │ │                      │  │  [opc-core] [opc-worker]      │    │   │
+│  │ │                      │  │  [file] [terminal] [+ 添加]   │    │   │
+│  │ │                      │  │                               │    │   │
+│  │ └──────────────────────┘  │  Capabilities:                 │    │   │
+│  │                           │  [flowchart_drawing] [✕]      │    │   │
+│  │ ┌─ 智能体组 ─────────┐    │  [data_charting] [✕]          │    │   │
+│  │ │                    │    │  [+ 添加能力标签]              │    │   │
+│  │ │ 📁 文档制作团队     │    │                               │    │   │
+│  │ │   researcher       │    │  ┌──────────────┐             │    │   │
+│  │ │   writer           │    │  │ [💾 保存]     │             │    │   │
+│  │ │   illustrator      │    │  │ [🗑️ 删除]     │             │    │   │
+│  │ │   ppt_maker        │    │  │ [📋 复制]     │             │    │   │
+│  │ │   reviewer         │    │  └──────────────┘             │    │   │
+│  │ │                    │    │                               │    │   │
+│  │ │ 📁 开发团队         │    └───────────────────────────────┘    │   │
+│  │ │   software_architect│                                         │   │
+│  │ │   backend_engineer  │  ┌─ 预览面板 ──────────────────────┐    │   │
+│  │ │   qa_engineer       │  │                                 │    │   │
+│  │ │   code_reviewer     │  │  System Prompt 预览:             │    │   │
+│  │ │                    │  │  ┌───────────────────────────┐   │    │   │
+│  │ │ 📁 安全审计团队     │  │  │ You are the OPC           │   │    │   │
+│  │ │   security_engineer │  │  │ Researcher Agent...       │   │    │   │
+│  │ │   code_reviewer     │  │  │ ...                       │   │    │   │
+│  │ │   qa_engineer       │  │  └───────────────────────────┘   │    │   │
+│  │ │                    │  │                                 │    │   │
+│  │ │ [+ 新建智能体组]    │  │  Worker JSON 预览:               │    │   │
+│  │ └────────────────────┘  │  {                               │    │   │
+│  │                         │    "id": "researcher",            │    │   │
+│  │                         │    "role": "worker",              │    │   │
+│  │                         │    ...                           │    │   │
+│  │                         │  }                               │    │   │
+│  └─────────────────────────┴──────────────────────────────────┘    │   │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.5.2 智能体 CRUD 操作
+
+**创建智能体**
+
+用户点击 `[+ 新建智能体]`，弹出创建向导（3 步）：
+
+```
+Step 1: 基础信息
+  ┌─────────────────────────────────────────────────────────┐
+  │  创建新智能体                                            │
+  │                                                         │
+  │  Worker ID:     [my_custom_agent                  ]     │
+  │  显示名称:       [我的自定义智能体                   ]     │
+  │  描述:           [负责处理XXX任务的专用智能体        ]     │
+  │  角色:           ○ Leader  ● Worker  ○ Evaluator       │
+  │  模型层:         ○ budget  ● standard  ○ premium       │
+  │  默认模型:       [claude-sonnet-4                  ▾]   │
+  │  超时 (秒):      [600                               ]   │
+  │                                                         │
+  │                                      [下一步 →]         │
+  └─────────────────────────────────────────────────────────┘
+
+Step 2: Skills & Toolsets
+  ┌─────────────────────────────────────────────────────────┐
+  │  配置 Skills 和工具集                                     │
+  │                                                         │
+  │  可用 Skills (27):                  已选 Skills (0):     │
+  │  ┌────────────────────┐          ┌──────────────────┐   │
+  │  │ 🔍 web_search      │  [添加→] │                  │   │
+  │  │ 📄 chapter_writing  │          │                  │   │
+  │  │ 📊 data_chart       │          │                  │   │
+  │  │ 📝 grammar_check    │          │                  │   │
+  │  │ ...                 │          │                  │   │
+  │  └────────────────────┘          └──────────────────┘   │
+  │                                                         │
+  │  可用 Toolsets:                    已选 Toolsets:        │
+  │  [opc-core] [opc-worker] [web]     [opc-core] [file]    │
+  │  [terminal] [browser] [file]       [+ 添加自定义工具集]  │
+  │                                                         │
+  │                                      [下一步 →]         │
+  └─────────────────────────────────────────────────────────┘
+
+Step 3: System Prompt 模板
+  ┌─────────────────────────────────────────────────────────┐
+  │  System Prompt 模板 (Jinja2)                              │
+  │  ┌─────────────────────────────────────────────────┐     │
+  │  │ You are the {{ worker_id }} Agent.              │     │
+│  │  │ Your job is to {{ description }}.             │     │
+│  │  │                                               │     │
+│  │  │ ## Task                                       │     │
+│  │  │ {{ task_prompt }}                             │     │
+│  │  │                                               │     │
+│  │  │ ## Upstream Context                           │     │
+│  │  │ {{ upstream_summaries }}                      │     │
+│  │  └─────────────────────────────────────────────────┘     │
+  │                                                         │
+  │  可用变量: {{ task_prompt }} {{ upstream_summaries }}    │
+  │           {{ worker_config }} {{ agent_list_summary }}   │
+  │                                                         │
+  │  [使用默认模板] [从已有智能体复制]                         │
+  │                                                         │
+  │  [← 上一步]                           [✅ 创建智能体]    │
+  └─────────────────────────────────────────────────────────┘
+```
+
+**编辑智能体**
+
+```
+点击列表中的智能体 → 中间面板显示编辑表单
+- 所有字段可编辑（Worker ID 创建后不可修改）
+- Skills/Toolsets 支持拖拽排序
+- 实时预览 System Prompt 渲染结果
+- [💾 保存] 写入 workers.yaml → AgentRegistry 热加载
+```
+
+**删除智能体**
+
+```
+点击 [🗑️ 删除] → 二次确认弹窗:
+  ┌───────────────────────────────────────────┐
+  │  ⚠️ 确认删除智能体 "my_custom_agent" ?     │
+  │                                           │
+  │  该智能体属于以下智能体组:                   │
+  │  · 文档制作团队                             │
+  │                                           │
+  │  删除后将从所有组中移除。                    │
+  │  已有任务的评估数据不会丢失。                 │
+  │                                           │
+  │  [取消]              [确认删除]             │
+  └───────────────────────────────────────────┘
+```
+
+**复制智能体**
+
+```
+点击 [📋 复制] → 基于现有智能体创建副本:
+  - 自动生成新 Worker ID (原ID_copy)
+  - 继承所有 Skills / Toolsets / System Prompt
+  - 用户可修改后保存
+```
+
+#### 3.5.3 智能体组（Agent Group）
+
+智能体组是将多个 Worker 组合为一个**命名团队**，方便在流水线模板和工作流中快速引用。
+
+**创建智能体组**
+
+```
+点击 [+ 新建智能体组] → 弹窗:
+
+┌──────────────────────────────────────────────────────────────┐
+│  创建智能体组                                                  │
+│                                                              │
+│  组名称:    [文档制作团队                              ]       │
+│  组描述:    [用于制作各类文档、报告、PPT的智能体组合    ]       │
+│                                                              │
+│  可用智能体:                          组成员 (5):              │
+│  ┌────────────────────┐          ┌──────────────────────┐    │
+│  │ 🔍 researcher      │  [添加→] │ 🔍 researcher     [✕]│    │
+│  │ ✍️ writer           │          │ ✍️ writer          [✕]│    │
+│  │ 🎨 illustrator      │          │ 🎨 illustrator     [✕]│    │
+│  │ 📊 ppt_maker        │          │ 📊 ppt_maker       [✕]│    │
+│  │ 📄 doc_maker        │          │ 📝 reviewer       [✕]│    │
+│  │ 📝 formatter        │          │                      │    │
+│  │ 📝 reviewer         │          │  排序: [↑] [↓]        │    │
+│  │ 📊 data_analyst     │          │                      │    │
+│  │ 🌐 translator       │          │                      │    │
+│  │ 🌐 browser_agent    │          │                      │    │
+│  │ 📧 email_agent      │          │                      │    │
+│  └────────────────────┘          └──────────────────────┘    │
+│                                                              │
+│  组默认配置:                                                  │
+│  默认模式: [Pipeline ▾]  │ 默认复杂度: [自动判定 ▾]          │
+│                                                              │
+│  [取消]                                    [✅ 创建组]       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**智能体组数据模型**
+
+```yaml
+# ~/.hermes/opc/agent_list/groups.yaml
+groups:
+  - id: doc_team
+    name: 文档制作团队
+    description: 用于制作各类文档、报告、PPT的智能体组合
+    worker_ids: [researcher, writer, illustrator, ppt_maker, reviewer]
+    default_mode: pipeline
+    default_complexity: auto
+    created_at: "2026-06-07T10:00:00Z"
+    updated_at: "2026-06-07T15:30:00Z"
+
+  - id: dev_team
+    name: 开发团队
+    description: 软件开发全流程智能体组合
+    worker_ids: [software_architect, backend_engineer, qa_engineer, code_reviewer]
+    default_mode: pipeline
+    default_complexity: auto
+
+  - id: security_audit_team
+    name: 安全审计团队
+    description: 安全审查与代码审计
+    worker_ids: [security_engineer, code_reviewer, qa_engineer]
+    default_mode: star
+    default_complexity: medium
+```
+
+#### 3.5.4 专用流水线模板（Pipeline Template）
+
+流水线模板定义了**特定工作流使用哪些智能体、以何种顺序执行、记忆策略如何配置**。用户可创建多个模板，在发起任务时选择。
+
+**流水线模板列表页**
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  流水线模板管理                                      [+ 新建流水线模板] │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ 📋 文档制作流水线 (Pipeline)                                    │    │
+│  │ researcher → writer → illustrator → ppt_maker → reviewer      │    │
+│  │ 使用组: 文档制作团队  │ 记忆模式: 摘要桥接  │ 复杂度: MEDIUM   │    │
+│  │ [使用] [编辑] [复制] [删除]                                    │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ 📋 快速研究报告 (Pipeline)                                      │    │
+│  │ researcher → writer → reviewer                                │    │
+│  │ 使用组: 文档制作团队 · 精简版  │ 复杂度: SIMPLE                │    │
+│  │ [使用] [编辑] [复制] [删除]                                    │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ 📋 后端功能开发 (Pipeline)                                      │    │
+│  │ software_architect → backend_engineer → qa_engineer → code_reviewer │
+│  │ 使用组: 开发团队  │ 记忆模式: 摘要桥接  │ 复杂度: MEDIUM       │    │
+│  │ [使用] [编辑] [复制] [删除]                                    │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ 📋 安全审计 (Star Delegation)                                   │    │
+│  │ ┌── security_engineer ──┐                                       │    │
+│  │ └── code_reviewer ─────┼── Leader 聚合                        │    │
+│  │ └── qa_engineer ───────┘                                       │    │
+│  │ 使用组: 安全审计团队  │ 记忆模式: 全文共享(模式B)  │ 复杂度: HIGH │
+│  │ [使用] [编辑] [复制] [删除]                                    │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**创建/编辑流水线模板**
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  创建流水线模板                                                       │
+│                                                                      │
+│  模板名称:    [文档制作完整流程                               ]       │
+│  模板描述:    [从调研到最终 PPT 的完整文档制作流水线          ]       │
+│                                                                      │
+│  ┌─── Step 1: 选择智能体组（可选） ──────────────────────────────┐   │
+│  │  基于智能体组快速填充:                                          │   │
+│  │  [文档制作团队 ▾]  [填充]                                      │   │
+│  │  或不使用组，手动选择智能体                                       │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌─── Step 2: 配置流水线步骤 ───────────────────────────────────┐    │
+│  │                                                               │    │
+│  │  Step 1: [researcher       ▾]  模型: [claude-sonnet-4   ▾]  │    │
+│  │   提示词: [Research the following topic and provide...    ]   │    │
+│  │   输出格式: [markdown ▾]  │  超时: [600]s                    │    │
+│  │   上游依赖: (无)                                              │    │
+│  │                                                      [✕ 删除] │    │
+│  │                                                               │    │
+│  │  Step 2: [writer            ▾]  模型: [默认             ▾]  │    │
+│  │   提示词: [Write a comprehensive report based on...      ]   │    │
+│  │   输出格式: [markdown ▾]  │  超时: [900]s                    │    │
+│  │   上游依赖: [✓] Step 1 (模式: [摘要桥接 A ▾])               │    │
+│  │                                                      [✕ 删除] │    │
+│  │                                                               │    │
+│  │  [+ 添加步骤]                                                 │    │
+│  │                                                               │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌─── Step 3: 全局配置 ─────────────────────────────────────────┐    │
+│  │                                                               │    │
+│  │  协同模式: [Pipeline ▾]  │  默认复杂度: [自动判定 ▾]         │    │
+│  │  默认记忆策略:                                                      │    │
+│  │    Worker ↔ Worker:     ● 摘要桥接 (模式A)                    │    │
+│  │                         ○ 全文共享 (模式B)                    │    │
+│  │                         ○ 完全隔离 (模式C)                    │    │
+│  │    Worker ↔ Leader:     TaskProtocol + ProgressReport (固定)  │    │
+│  │    Worker ↔ Evaluator:  快照 + 评分 (自动)                    │    │
+│  │                                                               │    │
+│  │  失败策略:  [重试2次后跳过 ▾]                                 │    │
+│  │  需要用户审批: [✓] MEDIUM及以上                               │    │
+│  │                                                               │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌─── Step 4: 预览 ──────────────────────────────────────────────┐   │
+│  │                                                               │    │
+│  │  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐  │    │
+│  │  │researcher│ ─A─→│ writer  │ ─A─→│illustrat│ ─A─→│reviewer │  │    │
+│  │  │  (600s) │     │ (900s)  │     │ (600s)  │     │ (300s)  │  │    │
+│  │  └─────────┘     └─────────┘     └─────────┘     └─────────┘  │    │
+│  │                                                               │    │
+│  │  预计总耗时: 10-15 分钟  │  总步骤数: 4                       │    │
+│  │                                                               │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  [取消]                                        [✅ 创建流水线模板]    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**流水线模板数据模型**
+
+```yaml
+# ~/.hermes/opc/pipelines/templates.yaml
+templates:
+  - id: doc_production_full
+    name: 文档制作完整流程
+    description: 从调研到最终 PPT 的完整文档制作流水线
+    group_id: doc_team
+    mode: pipeline
+    default_complexity: auto
+    memory_strategy:
+      worker_to_worker: mode_A  # 摘要桥接
+    failure_policy: retry_then_skip
+    require_approval: medium_and_above
+    steps:
+      - index: 0
+        worker_id: researcher
+        prompt_template: "Research the following topic and provide structured findings: {{ user_request }}"
+        expected_output_format: markdown
+        timeout_seconds: 600
+        model_override: null
+        upstream: []
+      - index: 1
+        worker_id: writer
+        prompt_template: "Write a comprehensive report based on the research findings. Include an executive summary, detailed analysis, and recommendations: {{ user_request }}"
+        expected_output_format: markdown
+        timeout_seconds: 900
+        model_override: null
+        upstream: [0]
+        memory_mode: A
+      - index: 2
+        worker_id: illustrator
+        prompt_template: "Create data visualizations and diagrams based on the report content. Generate charts for key metrics: {{ user_request }}"
+        expected_output_format: png + html
+        timeout_seconds: 600
+        model_override: null
+        upstream: [1]
+        memory_mode: A
+      - index: 3
+        worker_id: reviewer
+        prompt_template: "Review the complete output for quality, consistency, and accuracy. Check grammar, terminology, and completeness: {{ user_request }}"
+        expected_output_format: markdown review report
+        timeout_seconds: 300
+        model_override: null
+        upstream: [2]
+        memory_mode: A
+    created_at: "2026-06-07T10:00:00Z"
+```
+
+#### 3.5.5 使用流水线模板发起任务
+
+在 WebUI 中点击模板的 `[使用]` 按钮，进入任务发起页：
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  使用流水线模板: 文档制作完整流程                                      │
+│                                                                      │
+│  任务描述:     [帮我做一份 Q2 销售分析 PPT                    ]       │
+│                                                                      │
+│  复杂度:        ○ 自动判定  ● SIMPLE  ○ MEDIUM  ○ COMPLEX          │
+│                                                                      │
+│  记忆策略:      ● Worker间摘要桥接 (模式A)                            │
+│                ○ Worker间全文共享 (模式B)                            │
+│                                                                      │
+│  ┌─── 步骤预览 ─────────────────────────────────────────────────┐    │
+│  │                                                               │    │
+│  │  1. researcher  →  "Research Q2 sales data..."                │    │
+│  │  2. writer      →  "Write analysis report..."                  │    │
+│  │  3. illustrator →  "Create charts for metrics..."              │    │
+│  │  4. reviewer    →  "Review for quality and consistency..."     │    │
+│  │                                                               │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  [取消]                                  [🚀 发起任务]               │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.5.6 Agent Manager API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `GET /api/agents` | GET | 智能体列表（支持 `?role=` `?group=` 过滤） |
+| `GET /api/agents/:id` | GET | 智能体详情 |
+| `POST /api/agents` | POST | 创建新智能体 |
+| `PUT /api/agents/:id` | PUT | 更新智能体 |
+| `DELETE /api/agents/:id` | DELETE | 删除智能体 |
+| `POST /api/agents/:id/clone` | POST | 复制智能体 |
+| `GET /api/groups` | GET | 智能体组列表 |
+| `POST /api/groups` | POST | 创建智能体组 |
+| `PUT /api/groups/:id` | PUT | 更新智能体组 |
+| `DELETE /api/groups/:id` | DELETE | 删除智能体组 |
+| `GET /api/pipeline-templates` | GET | 流水线模板列表 |
+| `POST /api/pipeline-templates` | POST | 创建流水线模板 |
+| `PUT /api/pipeline-templates/:id` | PUT | 更新流水线模板 |
+| `DELETE /api/pipeline-templates/:id` | DELETE | 删除流水线模板 |
+| `POST /api/pipeline-templates/:id/execute` | POST | 使用模板发起任务 |
+
+#### 3.5.7 存储模型
+
+```
+~/.hermes/opc/
+  agent_list/
+    workers.yaml       ← 智能体定义
+    skills.yaml        ← Skill 定义
+    groups.yaml        ← 智能体组定义 (新增)
+  pipelines/
+    templates.yaml     ← 流水线模板定义 (新增)
+```
+
 ---
 
 ## 4. 多工作流编排

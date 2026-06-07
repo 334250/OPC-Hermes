@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-opc-border; }
+  body { @apply bg-opc-bg text-opc-text; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-opc-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-opc-text-2; }
+}
+
+@layer components {
+  .card { @apply bg-opc-surface border border-opc-border rounded-xl p-5 hover:border-opc-accent/30 transition-colors; }
+  .stat-value { @apply text-2xl font-semibold text-opc-text; }
+  .stat-label { @apply text-xs uppercase tracking-widest text-opc-text-2 mt-1; }
+  .badge { @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium; }
+  .badge-success { @apply badge bg-green-500/10 text-green-400; }
+  .badge-warning { @apply badge bg-yellow-500/10 text-yellow-400; }
+  .badge-error { @apply badge bg-red-500/10 text-red-400; }
+  .badge-info { @apply badge bg-blue-500/10 text-blue-400; }
+  .badge-accent { @apply badge bg-opc-accent/10 text-opc-accent; }
+  .btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors; }
+  .btn-primary { @apply btn bg-opc-accent text-white hover:bg-opc-accent-hover; }
+  .btn-secondary { @apply btn bg-opc-surface-2 text-opc-text hover:bg-opc-border; }
+  .btn-danger { @apply btn bg-red-500/10 text-red-400 hover:bg-red-500/20; }
+  .input { @apply w-full bg-opc-surface-2 border border-opc-border rounded-lg px-3 py-2 text-sm text-opc-text placeholder:text-opc-text-2 focus:outline-none focus:border-opc-accent/50; }
+}

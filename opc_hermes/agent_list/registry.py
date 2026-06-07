@@ -22,6 +22,7 @@ API:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field, asdict
 from importlib.resources import files
 from pathlib import Path

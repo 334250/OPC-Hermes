@@ -86,6 +86,7 @@ OPC-Hermes 的目标是在 Hermes Agent 运行时之上实现一个可编排、�
 | Phase 1 | 第 2-3 周 | Leader 接入 Hermes 插件链路 | `/opc` 或配置触发可生成计划 |
 | Phase 2 | 第 4-6 周 | Worker DAG 真实执行 | 至少 3 Worker Pipeline 可跑通 |
 | Phase 3 | 第 7-8 周 | 记忆与评估闭环 | Worker 输出自动写 Project Memory，评分写 Eval Memory |
+| Phase 3b | 第 8-9 周 | 管理面板后端 | 智能体组/流水线模板/模型管理器 CRUD + 29 API 端点 |
 | Phase 4 | 第 9-10 周 | 优化与知识库基础版 | 可生成优化提案，可检索 KB |
 | Phase 5 | 第 11-12 周 | CLI/WebUI 管理面 | 可查看 Agent、任务、产物、评分、提案 |
 | Phase 6 | 第 13-14 周 | Beta 硬化 | 安全、性能、端到端测试、文档齐备 |
@@ -274,7 +275,59 @@ Worker 执行完成后自动触发 Evaluator，对 Worker 产出进行评分，�
 3. Agent Registry 中 worker quality_score 有更新。
 4. Evaluator 无权写 Project Memory。
 
-## 9. Phase 4：Optimizer、Knowledge Pipeline、Revision Handler
+## 9. Phase 3b：管理面板后端 — 智能体组 + 流水线模板 + 模型管理器
+
+### 9.1 目标
+
+实现产品设计文档 §3.5（智能体管理面板）、§3.6（模型管理面板）、§5（工作流看板详情面板）要求的后端数据模型和 REST API。
+
+### 9.2 任务清单
+
+#### 智能体组与流水线模板
+
+| ID | 任务 | 说明 | 验收标准 |
+|----|------|------|----------|
+| P3b-1 | 实现 AgentGroup 数据模型 | `agent_list/` 新增 `groups.yaml` + `AgentGroup` dataclass + CRUD 方法 | 可通过 API 创建/编辑/删除分组 |
+| P3b-2 | 实现 PipelineTemplate 数据模型 | 新建 `pipeline_manager.py` + `pipelines/templates.yaml` | 模板可保存、编辑、按计划执行 |
+| P3b-3 | 实现 Agent CRUD API 端点 | POST/PUT/DELETE agents | 可通过 WebUI 增删改智能体 |
+| P3b-4 | 实现 Agent Group API 端点 | GET/POST/PUT/DELETE groups | 分组 CRUD 可用 |
+| P3b-5 | 实现 Pipeline API 端点 | GET/POST/PUT/DELETE pipelines | 模板管理可用 |
+
+#### 模型管理器
+
+| ID | 任务 | 说明 | 验收标准 |
+|----|------|------|----------|
+| P3b-6 | 实现 ModelDef / ModelGroup / ModelProvider 数据模型 | 新建 `model_manager.py` + `models/` 目录 | 模型数据可持久化到 YAML |
+| P3b-7 | 实现 Model CRUD API 端点 | GET/POST/PUT/DELETE models | 模型库可管理 |
+| P3b-8 | 实现 Model Group API 端点 | GET/POST/PUT/DELETE model groups | 分组 CRUD 可用 |
+| P3b-9 | 实现 Provider API 端点 | GET/POST providers | 供应商管理可用 |
+| P3b-10 | 实现模型连接验证 | POST /models/validate/:id | 测试 API 调用验证端点 |
+
+#### 工作流详情面板
+
+| ID | 任务 | 说明 | 验收标准 |
+|----|------|------|----------|
+| P3b-11 | 实现 `/api/tasks/{id}/agents` | 返回每个 Worker 完整状态 + 上下游 | 详情面板 Tab 2 数据可用 |
+| P3b-12 | 实现 `/api/tasks/{id}/memory-strategy` | 返回 SummaryBridge + 门控规则 | 详情面板 Tab 3 数据可用 |
+
+#### 测试
+
+| ID | 任务 | 验收标准 |
+|----|------|----------|
+| P3b-13 | Agent Group 集成测试 | CRUD + 成员管理 |
+| P3b-14 | Pipeline Template 集成测试 | 模板 CRUD + 执行 |
+| P3b-15 | Model Manager 集成测试 | 模型 CRUD + 分组 + 供应商 + 验证 |
+
+### 9.3 退出标准
+
+1. 29 个设计文档要求的 API 端点全部实现。
+2. 智能体组、流水线模板、模型管理器数据可 YAML 持久化。
+3. 工作流详情面板 4 个 Tab 的后端数据全部就绪。
+4. 所有新增端点有集成测试覆盖。
+
+---
+
+## 10. Phase 5：Optimizer、Knowledge Pipeline、Revision Handler
 
 ### 9.1 Optimizer
 
@@ -321,7 +374,7 @@ Worker 执行完成后自动触发 Evaluator，对 Worker 产出进行评分，�
 2. Knowledge Base 能写入、查询、按 Agent 过滤。
 3. 用户反馈“只改第 3 页图表”能路由到相关 Worker，而非重跑全流程。
 
-## 10. Phase 5：CLI 与 WebUI
+## 11. Phase 6：CLI 与 WebUI
 
 ### 10.1 CLI
 
@@ -367,7 +420,7 @@ WebUI 用于可视化管理，不应阻塞核心执行链路。
 2. WebUI 能查看任务 DAG、Worker 状态、评分和提案。
 3. WebUI 不能绕过人工审批直接自动应用优化。
 
-## 11. Phase 6：生产化与 Beta 发布
+## 12. Phase 7：生产化与 Beta 发布
 
 ### 11.1 安全
 

@@ -341,6 +341,87 @@ class AgentRegistry:
         return "\n".join(lines)
 
 
+# ── Agent Groups ────────────────────────────────────────────────────────
+
+
+@dataclass
+class AgentGroup:
+    """A named grouping of worker agents."""
+    id: str
+    name: str
+    description: str = ""
+    worker_ids: List[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentGroup":
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            description=data.get("description", ""),
+            worker_ids=data.get("worker_ids", []),
+        )
+
+
+class AgentGroupManager:
+    """Manages agent groups with YAML persistence."""
+
+    def __init__(self, data_dir: Optional[Path] = None):
+        if data_dir is None:
+            try:
+                from opc_hermes.config.loader import get_opc_home
+                data_dir = get_opc_home() / "agent_list"
+            except ImportError:
+                data_dir = Path.home() / ".hermes" / "opc" / "agent_list"
+        self._data_dir = Path(data_dir)
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def groups_file(self) -> Path:
+        return self._data_dir / "groups.yaml"
+
+    def list_groups(self) -> List[AgentGroup]:
+        if not self.groups_file.exists():
+            return []
+        with open(self.groups_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        return [AgentGroup.from_dict(g) for g in data.get("groups", [])]
+
+    def get_group(self, group_id: str) -> Optional[AgentGroup]:
+        for g in self.list_groups():
+            if g.id == group_id:
+                return g
+        return None
+
+    def save_group(self, group: AgentGroup) -> None:
+        groups = self.list_groups()
+        groups = [g for g in groups if g.id != group.id]
+        groups.append(group)
+        self._save_groups(groups)
+
+    def delete_group(self, group_id: str) -> bool:
+        groups = self.list_groups()
+        if not any(g.id == group_id for g in groups):
+            return False
+        groups = [g for g in groups if g.id != group_id]
+        self._save_groups(groups)
+        return True
+
+    def _save_groups(self, groups: List[AgentGroup]) -> None:
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.groups_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump({"groups": [asdict(g) for g in groups]}, f, allow_unicode=True, sort_keys=False)
+
+
+_group_manager: Optional[AgentGroupManager] = None
+
+
+def get_group_manager() -> AgentGroupManager:
+    global _group_manager
+    if _group_manager is None:
+        _group_manager = AgentGroupManager()
+    return _group_manager
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # Module-level convenience instance
 # ══════════════════════════════════════════════════════════════════════════

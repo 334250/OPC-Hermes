@@ -2,6 +2,7 @@ import { Routes, Route, NavLink } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import AgentList from './pages/AgentList'
 import AgentDetail from './pages/AgentDetail'
+import TaskList from './pages/TaskList'
 import TaskDetail from './pages/TaskDetail'
 import MemoryBrowser from './pages/MemoryBrowser'
 import ArtifactViewer from './pages/ArtifactViewer'
@@ -11,6 +12,7 @@ import Config from './pages/Config'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '◈' },
   { to: '/agents', label: 'Agents', icon: '⎔' },
+  { to: '/tasks', label: 'Tasks', icon: '▦' },
   { to: '/memory', label: 'Memory', icon: '▤' },
   { to: '/artifacts', label: 'Artifacts', icon: '⬡' },
   { to: '/proposals', label: 'Proposals', icon: '✦' },
@@ -57,6 +59,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/agents" element={<AgentList />} />
             <Route path="/agents/:agentId" element={<AgentDetail />} />
+            <Route path="/tasks" element={<TaskList />} />
             <Route path="/tasks/:taskId" element={<TaskDetail />} />
             <Route path="/memory" element={<MemoryBrowser />} />
             <Route path="/artifacts" element={<ArtifactViewer />} />

@@ -21,7 +21,8 @@ export default function Dashboard() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Active Workers" value={stats.total_workers ?? 0} />
+        <StatCard label="Active Tasks" value={stats.active_tasks ?? 0} />
+        <StatCard label="Total Workers" value={stats.total_workers ?? 0} />
         <StatCard label="Avg Quality" value={stats.avg_quality ? `${(stats.avg_quality * 100).toFixed(0)}%` : '—'} />
         <StatCard label="Pending Proposals" value={stats.pending_proposals ?? 0} />
         <StatCard label="Recent Evaluations" value={stats.recent_evaluations ?? 0} />

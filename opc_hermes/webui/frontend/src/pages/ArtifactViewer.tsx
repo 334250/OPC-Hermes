@@ -5,12 +5,15 @@ export default function ArtifactViewer() {
   const [taskId, setTaskId] = useState('')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const lookup = () => {
     if (!taskId.trim()) return
     setLoading(true)
+    setError(null)
     api.listArtifacts(taskId.trim())
       .then(setData)
+      .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }
 
@@ -28,6 +31,8 @@ export default function ArtifactViewer() {
         />
         <button onClick={lookup} className="btn-primary" disabled={loading}>Lookup</button>
       </div>
+
+      {error && <div className="card border-red-500/30 bg-red-500/5 mb-6"><p className="text-red-400 text-sm">{error}</p></div>}
 
       {loading && <div className="card animate-pulse"><div className="h-32 bg-opc-surface-2 rounded" /></div>}
 

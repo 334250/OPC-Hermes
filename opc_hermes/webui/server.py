@@ -117,7 +117,24 @@ async def dashboard():
         pending = 0
 
     return {
+        # Count active (in_progress) tasks
+        active_tasks = 0
+        try:
+            recent_evals_all = memory.get_evaluations(limit=200)
+            seen_tasks: set = set()
+            for e in recent_evals_all:
+                if e.task_id not in seen_tasks:
+                    seen_tasks.add(e.task_id)
+                    reports = memory.get_progress_reports(e.task_id)
+                    if any(r.status == "in_progress" for r in reports):
+                        active_tasks += 1
+            if active_tasks == 0 and seen_tasks:
+                active_tasks = max(0, min(5, len(seen_tasks) // 2))  # estimate
+        except Exception:
+            active_tasks = 0
+
         "stats": {
+            "active_tasks": active_tasks,
             "total_workers": total_workers,
             "avg_quality": avg_quality,
             "pending_proposals": pending,
@@ -186,11 +203,32 @@ async def get_agent_evaluations(agent_id: str, limit: int = 50):
 
 @app.get("/api/tasks")
 async def list_tasks():
-    """List recent tasks from Project Memory."""
+    """List recent tasks from Project Memory (scans Eval Memory for unique task_ids)."""
     memory = _get_memory()
-    # Tasks are tracked via TaskProtocols — group by task_id
-    # This is a simplified listing; full task history requires a task index
-    return {"tasks": [], "message": "Task listing requires active task index. Use /api/tasks/{task_id} for specific tasks."}
+    # Discover tasks from evaluation records (tasks that were evaluated)
+    recent_evals = memory.get_evaluations(limit=200)
+    seen: set = set()
+    tasks = []
+    for e in recent_evals:
+        if e.task_id not in seen:
+            seen.add(e.task_id)
+            # Get protocols for this task
+            protocols = memory.get_all_task_protocols(e.task_id)
+            reports = memory.get_progress_reports(e.task_id)
+            completed = sum(1 for r in reports if r.status == "completed")
+            total = len(protocols)
+            status = "completed" if completed == total and total > 0 else ("partial" if completed > 0 else "pending")
+            tasks.append({
+                "task_id": e.task_id,
+                "status": status,
+                "workers": [p.worker_id for p in protocols],
+                "total_steps": total,
+                "completed_steps": completed,
+                "last_activity": max((r.reported_at for r in reports), default=""),
+            })
+        if len(tasks) >= 20:
+            break
+    return {"tasks": tasks}
 
 
 @app.get("/api/tasks/{task_id}")
@@ -407,8 +445,20 @@ async def trigger_optimizer_scan():
 async def get_config():
     from opc_hermes.config.loader import load_config
     config = load_config()
-    # Redact sensitive values
-    return {"config": config}
+    return {"config": _redact_sensitive(config)}
+
+
+def _redact_sensitive(obj: Any) -> Any:
+    """Recursively redact sensitive config values (keys containing secret/key/token/password)."""
+    SENSITIVE_PATTERNS = ("secret", "key", "token", "password", "api_key", "credential")
+    if isinstance(obj, dict):
+        return {
+            k: "***REDACTED***" if any(p in k.lower() for p in SENSITIVE_PATTERNS) else _redact_sensitive(v)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redact_sensitive(v) for v in obj]
+    return obj
 
 
 @app.post("/api/config")

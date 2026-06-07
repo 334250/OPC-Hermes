@@ -23,7 +23,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from opc_hermes.delegate_adapter import (
     DelegateRequest,
@@ -123,7 +123,11 @@ class OPCWorkerDispatcher:
             worker_id = step.get("worker_id", "")
             reports = memory.get_progress_reports(task_id)
             for r in reports:
-                if r.worker_id == worker_id and r.status == "completed":
+                if (
+                    r.worker_id == worker_id
+                    and r.step_index == idx
+                    and r.status == "completed"
+                ):
                     completed_steps.add(idx)
                     logger.info("Recovery: step %d (%s) already completed — skipping", idx, worker_id)
                     break
@@ -165,10 +169,14 @@ class OPCWorkerDispatcher:
                 batch_results = self._execute_batch(
                     batch, task_id, upstream_outputs, completed_steps,
                 )
+                batch_abort: Optional[str] = None
             else:
-                batch_results = self._execute_sequential(
+                batch_results, batch_abort = self._execute_sequential(
                     batch, task_id, upstream_outputs, completed_steps,
+                    abort_reason=abort_reason,
                 )
+            if batch_abort:
+                abort_reason = batch_abort
 
             for result in batch_results:
                 idx = result.get("step_index", -1)
@@ -179,7 +187,7 @@ class OPCWorkerDispatcher:
                     all_artifacts.extend(result.get("artifacts", []))
                     # Write SummaryBridge
                     self._write_summary_bridge(task_id, result, step, task_plan)
-                elif result.get("status") in ("failed", "timeout"):
+                elif result.get("status") in ("failed", "timeout") and not abort_reason:
                     policy = self.failure_policy.get(result["status"], FailurePolicy.ABORT)
                     if policy == FailurePolicy.ABORT:
                         abort_reason = f"Step {idx} {result['status']}: {result.get('error', '')}"
@@ -245,10 +253,18 @@ class OPCWorkerDispatcher:
         task_id: str,
         upstream_outputs: Dict[int, str],
         completed_steps: set[int],
-    ) -> List[Dict[str, Any]]:
-        """Execute steps sequentially within a batch."""
+        abort_reason: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Execute steps sequentially within a batch.
+
+        Returns (results, abort_reason) — abort_reason is set if a step
+        with ABORT policy fails, so the caller can stop subsequent batches.
+        """
         results = []
         for step in batch:
+            if abort_reason:
+                results.append(self._skip_result(step, abort_reason))
+                continue
             idx = step.get("index", -1)
             if idx in completed_steps:
                 results.append(self._completed_already_result(step))
@@ -258,7 +274,14 @@ class OPCWorkerDispatcher:
             # Update upstream_outputs for subsequent steps in this batch
             if result.get("status") == "completed":
                 upstream_outputs[idx] = result.get("output", "")
-        return results
+            elif result.get("status") in ("failed", "timeout"):
+                policy = self.failure_policy.get(result["status"], FailurePolicy.ABORT)
+                if policy == FailurePolicy.ABORT:
+                    abort_reason = (
+                        f"Step {idx} ({result['status']}): "
+                        f"{result.get('error', 'unknown')}"
+                    )
+        return results, abort_reason
 
     # ── Single step execution with retry ─────────────────────────────────
 

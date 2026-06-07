@@ -51,6 +51,7 @@ class DelegateRequest:
     max_iterations: int = 60
     timeout_seconds: int = 600
     context: Optional[str] = None      # upstream summaries (rendered)
+    parent_agent: Any = None           # the Hermes AIAgent instance (for real delegate)
     extra_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -111,23 +112,19 @@ def _build_real_adapter() -> AdapterFn:
     importing Hermes internals.
     """
     try:
-        from hermes_agent.tools.delegate_tool import (
-            delegate_task as _real_delegate,
-        )
+        from tools.delegate_tool import delegate_task as _real_delegate
 
         def _real_adapter(request: DelegateRequest) -> DelegateResult:
             t0 = time.monotonic()
+            parent = getattr(request, 'parent_agent', None)
             try:
                 raw = _real_delegate(
-                    task=request.prompt,
-                    role=request.worker_id,
-                    model=request.model or None,
+                    goal=request.prompt,
+                    role="leaf",
+                    context=request.context or None,
                     toolsets=request.toolsets,
                     max_iterations=request.max_iterations,
-                    timeout=request.timeout_seconds,
-                    system_prompt=request.system_prompt or None,
-                    context=request.context or None,
-                    task_id=request.task_id,
+                    parent_agent=parent,
                 )
                 duration = (time.monotonic() - t0) * 1000
                 if isinstance(raw, dict):
@@ -164,7 +161,7 @@ def _build_real_adapter() -> AdapterFn:
 
     except ImportError:
         logger.warning(
-            "Could not import hermes_agent.tools.delegate_tool. "
+            "Could not import tools.delegate_tool. "
             "Delegate adapter will fail until a real or fake adapter is set."
         )
 

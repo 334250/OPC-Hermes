@@ -117,6 +117,7 @@ class AgentRegistry:
         self._workers: Dict[str, WorkerDef] = {}
         self._skills: Dict[str, SkillDef] = {}
         self._loaded = False
+        self._write_lock = threading.Lock()  # guards mutations for thread safety
 
     # ── Initialization ───────────────────────────────────────────────────
 
@@ -286,14 +287,15 @@ class AgentRegistry:
             self._save_workers()
 
     def record_task_outcome(self, worker_id: str, success: bool) -> None:
-        """Record a task completion outcome for a worker."""
+        """Record a task completion outcome for a worker (thread-safe)."""
         self.load()
-        worker = self._workers.get(worker_id)
-        if worker:
-            worker.total_tasks += 1
-            if success:
-                worker.successful_tasks += 1
-            self._save_workers()
+        with self._write_lock:
+            worker = self._workers.get(worker_id)
+            if worker:
+                worker.total_tasks += 1
+                if success:
+                    worker.successful_tasks += 1
+                self._save_workers()
 
     # ── Persistence ──────────────────────────────────────────────────────
 

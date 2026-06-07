@@ -31,14 +31,25 @@ provider, network access, or writes to the user's real `~/.hermes` directory.
 
 ## Current Implementation Status
 
-- Phase 0 baseline is implemented: package metadata, config loading, default
-  registry resources, import stability, and local-state path handling.
-- Phase 1 routing and planning guards are implemented: `/opc` gateway routing,
-  Leader prompt injection, strict plan JSON validation, model allowlisting, and
-  pending-plan approval binding.
-- Worker dispatch is still a Phase 1 stub. Approved plans are validated and
-  routed through `OPCWorkerDispatcher`, but real Hermes Worker delegation and
-  durable approval storage belong to the next implementation phase.
+| Phase | Name | Status |
+|-------|------|--------|
+| 0 | Engineering Baseline | ✅ Complete |
+| 1 | Plugin & Leader Routing | ✅ Complete |
+| 2 | Worker Dispatch & DAG | ✅ Complete |
+| 3 | Evaluator Quality Loop | ✅ Complete |
+| 4 | Optimizer + KB + Revision | ✅ Complete |
+| 5 | WebUI (taste-skill + React) | ✅ Complete |
+| 6 | Production Hardening | ✅ Complete |
+
+**Core capabilities delivered:**
+- Leader Agent receives user requests, evaluates complexity, generates plans
+- Worker Dispatcher executes DAG plans with parallel/sequential/pipeline modes
+- Evaluator scores Worker output on 5 dimensions, writes to Eval Memory
+- Optimizer scans evaluations, generates proposals, requires human approval
+- Knowledge Pipeline ingests files (md/txt/csv/json) into Knowledge Base
+- Revision Handler classifies feedback and routes to affected Workers only
+- WebUI: React dashboard with 9 pages (Dashboard, Agents, Tasks, Memory, Artifacts, Proposals, Config)
+- Security: path validation, secret scanning, prompt injection guards, WebUI CORS control
 
 ## Runtime State
 

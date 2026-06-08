@@ -208,8 +208,20 @@ export function HermesSessionsPage() {
   )
 }
 
-function providerModels(providers: HermesModelOptionProvider[], slug: string) {
-  return providers.find((p) => p.slug === slug || p.name === slug)?.models ?? []
+function providerModels(providers: any[], slug: string): string[] {
+  const p = providers.find((p: any) => p.slug === slug || p.name === slug)
+  if (!p || !p.models) return []
+  // OPC catalog: models are objects with id/display_name
+  // Hermes: models are strings
+  return p.models.map((m: any) => (typeof m === 'string' ? m : m.id))
+}
+
+function providerModelDisplay(providers: any[], slug: string, modelId: string): string {
+  const p = providers.find((p: any) => p.slug === slug || p.name === slug)
+  if (!p || !p.models) return modelId
+  const m = p.models.find((m: any) => (typeof m === 'string' ? m === modelId : m.id === modelId))
+  if (!m) return modelId
+  return typeof m === 'string' ? m : (m.display_name || m.id)
 }
 
 export function HermesModelsPage() {
@@ -228,16 +240,26 @@ export function HermesModelsPage() {
     setState('loading')
     setError('')
     try {
-      const [modelInfo, options, auxiliary] = await Promise.all([
+      const [modelInfo, options, auxiliary, catalog] = await Promise.all([
         api.hermesModelInfo(),
         api.hermesModelOptions(),
         api.hermesAuxiliaryModels(),
+        fetch('/api/hermes/opc-model-catalog').then(r => r.json()).catch(() => ({ providers: [] })),
       ])
-      const optionProviders = options.providers ?? []
-      const currentProvider = modelInfo.provider || options.provider || auxiliary.main?.provider || optionProviders[0]?.slug || ''
+      // Merge OPC catalog providers with Hermes providers (OPC catalog takes precedence)
+      const opcProviders = catalog.providers ?? []
+      const hermesProviders = options.providers ?? []
+      const mergedMap = new Map<string, any>()
+      for (const p of opcProviders) mergedMap.set(p.slug || p.name, p)
+      for (const p of hermesProviders) {
+        if (!mergedMap.has(p.slug || p.name)) mergedMap.set(p.slug || p.name, p)
+      }
+      const mergedProviders = Array.from(mergedMap.values())
+
+      const currentProvider = modelInfo.provider || options.provider || auxiliary.main?.provider || mergedProviders[0]?.slug || ''
       const currentModel = modelInfo.model || options.model || auxiliary.main?.model || ''
       setInfo(modelInfo)
-      setProviders(optionProviders)
+      setProviders(mergedProviders)
       setAux(auxiliary.tasks ?? [])
       setProvider(currentProvider)
       setModel(currentModel)
@@ -304,7 +326,7 @@ export function HermesModelsPage() {
             </select>
             {mainModels.length ? (
               <select className="input" value={model} onChange={(e) => setModel(e.target.value)}>
-                {mainModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                {mainModels.map((m: string) => <option key={m} value={m}>{providerModelDisplay(providers, provider, m)}</option>)}
               </select>
             ) : (
               <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="provider/model" />
@@ -340,7 +362,7 @@ export function HermesModelsPage() {
                       {models.length ? (
                         <select className="input" value={draft.model} onChange={(e) => setAuxDraft((prev) => ({ ...prev, [row.task]: { ...draft, model: e.target.value } }))}>
                           <option value="">default</option>
-                          {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                          {models.map((m: string) => <option key={m} value={m}>{m}</option>)}
                         </select>
                       ) : (
                         <input className="input" value={draft.model} onChange={(e) => setAuxDraft((prev) => ({ ...prev, [row.task]: { ...draft, model: e.target.value } }))} placeholder="default" />

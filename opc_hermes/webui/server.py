@@ -926,6 +926,72 @@ if FRONTEND_DIR.exists():
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# OPC Model Catalog — all known providers + models
+# ══════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/hermes/opc-model-catalog")
+async def opc_model_catalog():
+    """Return ALL known providers and models from OPC Model Manager + Hermes.
+
+    This endpoint provides the complete model catalog for the WebUI,
+    not just the subset currently configured in Hermes.
+    """
+    from opc_hermes.model_manager import ModelManager
+    mm = ModelManager()
+    models = mm.list_models()
+    providers_list = mm.list_providers()
+    groups = mm.list_groups()
+
+    # Build provider → models mapping
+    provider_models: Dict[str, List[Dict[str, Any]]] = {}
+    for m in models:
+        if not m.active:
+            continue
+        entry = {
+            "id": m.id,
+            "display_name": m.display_name,
+            "tier": m.tier,
+            "context_length": m.context_length,
+            "capabilities": m.capabilities,
+            "suitable_complexity": m.suitable_complexity,
+            "api_base": m.api_base,
+            "description": m.description,
+        }
+        provider_models.setdefault(m.provider, []).append(entry)
+
+    # Build providers list
+    catalog_providers = []
+    for p in providers_list:
+        catalog_providers.append({
+            "slug": p.id,
+            "name": p.name,
+            "api_base": p.api_base,
+            "total_models": len(provider_models.get(p.id, [])),
+            "models": provider_models.get(p.id, []),
+        })
+
+    # Merge with Hermes native model options if available
+    extra_providers = []
+    try:
+        if _HERMES_WEB_SERVER is not None:
+            # Try to get Hermes model options
+            pass  # Hermes API handled separately by frontend
+    except Exception:
+        pass
+
+    return {
+        "providers": catalog_providers,
+        "groups": [asdict(g) for g in groups],
+        "default_tier_order": ["premium", "standard", "budget"],
+        "capability_filters": [
+            {"key": "vision", "label": "Vision"},
+            {"key": "tool_calling", "label": "Tool Calling"},
+            {"key": "image_gen", "label": "Image Generation"},
+        ],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════
 

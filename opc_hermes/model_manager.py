@@ -91,58 +91,61 @@ class ModelProvider:
         )
 
 
-# Default models matching the design doc §3.6.6 + §7.3 capability matrix
+# Default models — comprehensive catalog of all major providers and models
 DEFAULT_MODELS = [
-    ModelDef(
-        id="claude-sonnet-4", display_name="Claude Sonnet 4", provider="anthropic",
-        tier="premium", context_length=200000,
-        capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False},
-        suitable_complexity=["SIMPLE", "MEDIUM", "COMPLEX"],
-        description="Anthropic Claude Sonnet 4 — best-in-class reasoning",
-    ),
-    ModelDef(
-        id="gpt-4o", display_name="GPT-4o", provider="openai",
-        tier="premium", context_length=128000,
-        capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False},
-        suitable_complexity=["MEDIUM", "COMPLEX"],
-        description="OpenAI GPT-4o — multimodal complex tasks",
-    ),
-    ModelDef(
-        id="gpt-4o-mini", display_name="GPT-4o Mini", provider="openai",
-        tier="budget", context_length=128000,
-        capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False},
-        suitable_complexity=["SIMPLE"],
-        description="OpenAI GPT-4o Mini — lightweight tasks",
-    ),
-    ModelDef(
-        id="gemini-2.5-flash", display_name="Gemini 2.5 Flash", provider="google",
-        tier="budget", context_length=1000000,
-        capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False},
-        suitable_complexity=["SIMPLE", "MEDIUM"],
-        description="Google Gemini 2.5 Flash — ultra-long context",
-    ),
-    ModelDef(
-        id="deepseek-v3", display_name="DeepSeek V3", provider="deepseek",
-        tier="standard", context_length=64000,
-        capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False},
-        suitable_complexity=["SIMPLE", "MEDIUM"],
-        description="DeepSeek V3 — strong text reasoning",
-    ),
-    ModelDef(
-        id="minicpmv4.6", display_name="MiniCPM V4.6", provider="openbmb",
-        tier="budget", context_length=8000,
-        capabilities={"vision": True, "tool_calling": False, "image_gen": False, "audio_stt": False},
-        suitable_complexity=["SIMPLE"],
-        description="OpenBMB MiniCPM — local vision model",
-    ),
+    # ── Anthropic ──────────────────────────────────────────────────────────
+    ModelDef(id="claude-sonnet-4", display_name="Claude Sonnet 4", provider="anthropic", tier="premium", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM", "COMPLEX"], description="Anthropic Claude Sonnet 4 — best-in-class reasoning"),
+    ModelDef(id="claude-3.5-sonnet", display_name="Claude 3.5 Sonnet", provider="anthropic", tier="standard", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM", "COMPLEX"], description="Anthropic Claude 3.5 Sonnet"),
+    ModelDef(id="claude-3.5-haiku", display_name="Claude 3.5 Haiku", provider="anthropic", tier="budget", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Anthropic Claude 3.5 Haiku — fast and affordable"),
+    ModelDef(id="claude-opus-4", display_name="Claude Opus 4", provider="anthropic", tier="premium", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["COMPLEX"], description="Anthropic Claude Opus 4 — most powerful"),
+    # ── OpenAI ─────────────────────────────────────────────────────────────
+    ModelDef(id="gpt-4o", display_name="GPT-4o", provider="openai", tier="premium", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="OpenAI GPT-4o — multimodal flagship"),
+    ModelDef(id="gpt-4o-mini", display_name="GPT-4o Mini", provider="openai", tier="budget", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="OpenAI GPT-4o Mini — lightweight"),
+    ModelDef(id="gpt-4.1", display_name="GPT-4.1", provider="openai", tier="premium", context_length=1000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="OpenAI GPT-4.1 — 1M context"),
+    ModelDef(id="gpt-4.1-mini", display_name="GPT-4.1 Mini", provider="openai", tier="standard", context_length=1000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="OpenAI GPT-4.1 Mini"),
+    ModelDef(id="gpt-4.1-nano", display_name="GPT-4.1 Nano", provider="openai", tier="budget", context_length=1000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="OpenAI GPT-4.1 Nano — cheapest"),
+    ModelDef(id="o3-mini", display_name="o3 Mini", provider="openai", tier="premium", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="OpenAI o3 Mini — reasoning model"),
+    ModelDef(id="o4-mini", display_name="o4 Mini", provider="openai", tier="premium", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["COMPLEX"], description="OpenAI o4 Mini — advanced reasoning"),
+    # ── Google ─────────────────────────────────────────────────────────────
+    ModelDef(id="gemini-2.5-flash", display_name="Gemini 2.5 Flash", provider="google", tier="budget", context_length=1000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Google Gemini 2.5 Flash — 1M context"),
+    ModelDef(id="gemini-2.5-pro", display_name="Gemini 2.5 Pro", provider="google", tier="premium", context_length=1000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="Google Gemini 2.5 Pro — most capable"),
+    ModelDef(id="gemini-2.0-flash", display_name="Gemini 2.0 Flash", provider="google", tier="budget", context_length=1000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="Google Gemini 2.0 Flash"),
+    # ── DeepSeek ───────────────────────────────────────────────────────────
+    ModelDef(id="deepseek-v3", display_name="DeepSeek V3", provider="deepseek", tier="standard", context_length=64000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="DeepSeek V3 — strong text reasoning"),
+    ModelDef(id="deepseek-r1", display_name="DeepSeek R1", provider="deepseek", tier="premium", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="DeepSeek R1 — chain-of-thought reasoning"),
+    ModelDef(id="deepseek-coder", display_name="DeepSeek Coder V2", provider="deepseek", tier="standard", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="DeepSeek Coder V2 — code specialist"),
+    # ── Meta (via OpenRouter/self-host) ───────────────────────────────────
+    ModelDef(id="llama-4-maverick", display_name="Llama 4 Maverick", provider="meta", tier="standard", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Meta Llama 4 Maverick — open-weight"),
+    ModelDef(id="llama-4-scout", display_name="Llama 4 Scout", provider="meta", tier="budget", context_length=10000000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Meta Llama 4 Scout — 10M context"),
+    # ── Mistral ────────────────────────────────────────────────────────────
+    ModelDef(id="mistral-large", display_name="Mistral Large", provider="mistral", tier="premium", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="Mistral Large — flagship model"),
+    ModelDef(id="mistral-small", display_name="Mistral Small", provider="mistral", tier="standard", context_length=32000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Mistral Small — efficient"),
+    ModelDef(id="codestral", display_name="Codestral", provider="mistral", tier="standard", context_length=256000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Mistral Codestral — code generation"),
+    ModelDef(id="mixtral-8x22b", display_name="Mixtral 8x22B", provider="mistral", tier="standard", context_length=64000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Mistral Mixtral 8x22B — MoE"),
+    # ── xAI / Grok ────────────────────────────────────────────────────────
+    ModelDef(id="grok-3", display_name="Grok 3", provider="xai", tier="premium", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="xAI Grok 3 — deep reasoning"),
+    ModelDef(id="grok-3-mini", display_name="Grok 3 Mini", provider="xai", tier="standard", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="xAI Grok 3 Mini — fast reasoning"),
+    # ── Cohere ─────────────────────────────────────────────────────────────
+    ModelDef(id="command-r-plus", display_name="Command R+", provider="cohere", tier="premium", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="Cohere Command R+ — enterprise RAG"),
+    ModelDef(id="command-r", display_name="Command R", provider="cohere", tier="standard", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Cohere Command R — efficient RAG"),
+    # ── Alibaba / Qwen ────────────────────────────────────────────────────
+    ModelDef(id="qwen-max", display_name="Qwen Max", provider="alibaba", tier="premium", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="Alibaba Qwen Max — flagship"),
+    ModelDef(id="qwen-plus", display_name="Qwen Plus", provider="alibaba", tier="standard", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Alibaba Qwen Plus — balanced"),
+    ModelDef(id="qwen-coder", display_name="Qwen Coder", provider="alibaba", tier="standard", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Alibaba Qwen Coder — code specialist"),
+    # ── Anthropic-compatible / OpenRouter ──────────────────────────────────
+    ModelDef(id="openrouter-auto", display_name="OpenRouter Auto", provider="openrouter", tier="standard", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM", "COMPLEX"], description="OpenRouter — auto-select best model"),
+    # ── Open-source local ──────────────────────────────────────────────────
+    ModelDef(id="minicpmv4.6", display_name="MiniCPM V4.6", provider="openbmb", tier="budget", context_length=8000, capabilities={"vision": True, "tool_calling": False, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="OpenBMB MiniCPM — local vision model"),
 ]
 
 DEFAULT_GROUPS = [
-    ModelGroup(id="premium_tier", name="Premium Tier", dimension="tier", model_ids=["claude-sonnet-4", "gpt-4o"]),
-    ModelGroup(id="standard_tier", name="Standard Tier", dimension="tier", model_ids=["deepseek-v3"]),
-    ModelGroup(id="budget_tier", name="Budget Tier", dimension="tier", model_ids=["gpt-4o-mini", "gemini-2.5-flash", "minicpmv4.6"]),
+    ModelGroup(id="premium_tier", name="Premium Tier", dimension="tier", model_ids=["claude-sonnet-4", "gpt-4o", "claude-opus-4", "gpt-4.1", "o3-mini", "o4-mini", "gemini-2.5-pro", "deepseek-r1", "mistral-large", "grok-3", "command-r-plus", "qwen-max"]),
+    ModelGroup(id="standard_tier", name="Standard Tier", dimension="tier", model_ids=["claude-3.5-sonnet", "gpt-4.1-mini", "deepseek-v3", "deepseek-coder", "llama-4-maverick", "mistral-small", "codestral", "mixtral-8x22b", "grok-3-mini", "command-r", "qwen-plus", "qwen-coder", "openrouter-auto"]),
+    ModelGroup(id="budget_tier", name="Budget Tier", dimension="tier", model_ids=["claude-3.5-haiku", "gpt-4o-mini", "gpt-4.1-nano", "gemini-2.5-flash", "gemini-2.0-flash", "llama-4-scout", "minicpmv4.6"]),
     ModelGroup(id="vision_ready", name="Vision-Ready", dimension="capability", filter={"vision": True}),
     ModelGroup(id="tool_calling", name="Tool-Calling", dimension="capability", filter={"tool_calling": True}),
+    ModelGroup(id="reasoning", name="Reasoning Models", dimension="scenario", model_ids=["o3-mini", "o4-mini", "deepseek-r1", "grok-3"]),
+    ModelGroup(id="code_specialist", name="Code Specialists", dimension="scenario", model_ids=["deepseek-coder", "codestral", "qwen-coder"]),
 ]
 
 DEFAULT_PROVIDERS = [
@@ -150,6 +153,12 @@ DEFAULT_PROVIDERS = [
     ModelProvider(id="openai", name="OpenAI", api_base="https://api.openai.com/v1", api_key_ref="${OPENAI_API_KEY}"),
     ModelProvider(id="google", name="Google", api_base="https://generativelanguage.googleapis.com", api_key_ref="${GOOGLE_API_KEY}"),
     ModelProvider(id="deepseek", name="DeepSeek", api_base="https://api.deepseek.com", api_key_ref="${DEEPSEEK_API_KEY}"),
+    ModelProvider(id="meta", name="Meta", api_base="https://openrouter.ai/api/v1", api_key_ref="${OPENROUTER_API_KEY}"),
+    ModelProvider(id="mistral", name="Mistral", api_base="https://api.mistral.ai/v1", api_key_ref="${MISTRAL_API_KEY}"),
+    ModelProvider(id="xai", name="xAI", api_base="https://api.x.ai/v1", api_key_ref="${XAI_API_KEY}"),
+    ModelProvider(id="cohere", name="Cohere", api_base="https://api.cohere.ai/v1", api_key_ref="${COHERE_API_KEY}"),
+    ModelProvider(id="alibaba", name="Alibaba Cloud", api_base="https://dashscope.aliyuncs.com/compatible-mode/v1", api_key_ref="${DASHSCOPE_API_KEY}"),
+    ModelProvider(id="openrouter", name="OpenRouter", api_base="https://openrouter.ai/api/v1", api_key_ref="${OPENROUTER_API_KEY}"),
     ModelProvider(id="openbmb", name="OpenBMB", api_base="", api_key_ref=""),
     ModelProvider(id="custom", name="Custom", api_base="", api_key_ref=""),
 ]

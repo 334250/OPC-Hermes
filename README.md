@@ -18,7 +18,10 @@ gated memory, quality evaluation, and optimization proposals.
 git clone https://github.com/334250/OPC-Hermes.git
 cd OPC-Hermes
 
-# 首次运行：初始化数据 + 启动 WebUI
+# 1. 创建虚拟环境 + 安装依赖 + 初始化数据
+./scripts/setup-venv.sh --webui
+
+# 2. 启动 WebUI
 ./scripts/start-opc.sh --seed
 
 # 日常启动（跳过初始化）

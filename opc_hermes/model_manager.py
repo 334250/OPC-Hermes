@@ -161,6 +161,7 @@ DEFAULT_GROUPS = [
     ModelGroup(id="reasoning", name="Reasoning Models", dimension="scenario", model_ids=["o3-mini", "o4-mini", "deepseek-r1", "grok-3"]),
     ModelGroup(id="code_specialist", name="Code Specialists", dimension="scenario", model_ids=["deepseek-coder", "codestral", "qwen-coder"]),
     ModelGroup(id="local_deploy", name="本地部署 (Local)", dimension="scenario", model_ids=["llama-3.3-70b", "qwen2.5-72b", "deepseek-coder-33b", "mistral-nemo", "phi-4", "gemma-3-27b", "llama-3.2-3b", "qwen2.5-7b", "granite-3.1-8b", "local-model", "vllm-model", "localai-model"]),
+    ModelGroup(id="cloud_gpu", name="云 GPU 推理", dimension="scenario", model_ids=["claude-sonnet-4", "gpt-4o", "deepseek-v3", "deepseek-r1", "llama-4-maverick", "qwen-max"]),
 ]
 
 DEFAULT_PROVIDERS = [
@@ -180,6 +181,19 @@ DEFAULT_PROVIDERS = [
     ModelProvider(id="vllm", name="vLLM (自部署)", api_base="http://localhost:8000/v1", api_key_ref=""),
     ModelProvider(id="localai", name="LocalAI (自部署)", api_base="http://localhost:8080/v1", api_key_ref=""),
     ModelProvider(id="llamacpp", name="llama.cpp Server (本地)", api_base="http://localhost:8081/v1", api_key_ref=""),
+    ModelProvider(id="textgen", name="TextGen WebUI (oobabooga)", api_base="http://localhost:5000/v1", api_key_ref=""),
+    ModelProvider(id="koboldcpp", name="KoboldCpp (本地)", api_base="http://localhost:5001/api/v1", api_key_ref=""),
+    ModelProvider(id="jan", name="Jan (桌面本地)", api_base="http://localhost:1337/v1", api_key_ref=""),
+    ModelProvider(id="gpt4all", name="GPT4All (本地)", api_base="http://localhost:4891/v1", api_key_ref=""),
+    ModelProvider(id="exllamav2", name="ExLlamaV2 (高性能GPU)", api_base="http://localhost:5000/v1", api_key_ref=""),
+    ModelProvider(id="aphrodite", name="Aphrodite Engine", api_base="http://localhost:2242/v1", api_key_ref=""),
+    ModelProvider(id="together", name="Together AI (云GPU)", api_base="https://api.together.xyz/v1", api_key_ref="${TOGETHER_API_KEY}"),
+    ModelProvider(id="groq", name="Groq (LPU推理)", api_base="https://api.groq.com/openai/v1", api_key_ref="${GROQ_API_KEY}"),
+    ModelProvider(id="fireworks", name="Fireworks AI (云GPU)", api_base="https://api.fireworks.ai/inference/v1", api_key_ref="${FIREWORKS_API_KEY}"),
+    ModelProvider(id="replicate", name="Replicate (云GPU)", api_base="https://api.replicate.com/v1", api_key_ref="${REPLICATE_API_TOKEN}"),
+    ModelProvider(id="runpod", name="RunPod (云GPU)", api_base="https://api.runpod.ai/v2", api_key_ref="${RUNPOD_API_KEY}"),
+    ModelProvider(id="novita", name="Novita AI (云GPU)", api_base="https://api.novita.ai/v3/openai", api_key_ref="${NOVITA_API_KEY}"),
+    ModelProvider(id="hyperbolic", name="Hyperbolic (云GPU)", api_base="https://api.hyperbolic.xyz/v1", api_key_ref="${HYPERBOLIC_API_KEY}"),
     ModelProvider(id="custom", name="Custom (自定义端点)", api_base="", api_key_ref=""),
 ]
 

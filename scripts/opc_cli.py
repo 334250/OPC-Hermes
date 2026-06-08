@@ -44,7 +44,13 @@ def cmd_seed():
             count += 1
 
     from opc_hermes.model_manager import ModelManager
+    import os as _os
     mm = ModelManager()
+    # Force re-seed by deleting old files
+    for _f in [mm.models_file, mm.groups_file, mm.providers_file]:
+        if _f.exists():
+            _os.remove(_f)
+    mm._seed_defaults()
     m_count = len(mm.list_models())
     g_count = len(mm.list_groups())
     p_count = len(mm.list_providers())

@@ -223,6 +223,19 @@ class ModelManager:
         return self._data_dir / "providers.yaml"
 
     def _seed_defaults(self) -> None:
+        """Seed defaults, overwriting stale files that don't match current defaults."""
+        # Force reseed if model count changed (upgrade scenario)
+        if self.models_file.exists():
+            try:
+                with open(self.models_file, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                existing = len(data.get("models", []))
+                if existing < len(DEFAULT_MODELS):
+                    self.models_file.unlink()
+                    self.groups_file.unlink(missing_ok=True)
+                    self.providers_file.unlink(missing_ok=True)
+            except Exception:
+                pass
         if not self.models_file.exists():
             self._save_models(DEFAULT_MODELS)
         if not self.groups_file.exists():

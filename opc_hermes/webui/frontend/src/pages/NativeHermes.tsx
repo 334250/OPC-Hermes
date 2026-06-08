@@ -241,29 +241,27 @@ export function HermesModelsPage() {
     setError('')
     try {
       const [modelInfo, options, auxiliary, catalog] = await Promise.all([
-        api.hermesModelInfo(),
-        api.hermesModelOptions(),
-        api.hermesAuxiliaryModels(),
+        api.hermesModelInfo().catch(() => null),
+        api.hermesModelOptions().catch(() => ({ providers: [] })),
+        api.hermesAuxiliaryModels().catch(() => ({ main: { provider: '', model: '' }, tasks: [] })),
         fetch('/api/hermes/opc-model-catalog').then(r => r.json()).catch(() => ({ providers: [] })),
       ])
-      // Merge OPC catalog providers with Hermes providers (OPC catalog takes precedence)
-      const opcProviders = catalog.providers ?? []
-      const hermesProviders = options.providers ?? []
+      const opcProviders = catalog?.providers ?? []
+      const hermesProviders = options?.providers ?? []
       const mergedMap = new Map<string, any>()
       for (const p of opcProviders) mergedMap.set(p.slug || p.name, p)
       for (const p of hermesProviders) {
         if (!mergedMap.has(p.slug || p.name)) mergedMap.set(p.slug || p.name, p)
       }
       const mergedProviders = Array.from(mergedMap.values())
-
-      const currentProvider = modelInfo.provider || options.provider || auxiliary.main?.provider || mergedProviders[0]?.slug || ''
-      const currentModel = modelInfo.model || options.model || auxiliary.main?.model || ''
-      setInfo(modelInfo)
+      const currentProvider = modelInfo?.provider || (options as any)?.provider || auxiliary?.main?.provider || mergedProviders[0]?.slug || ''
+      const currentModel = modelInfo?.model || (options as any)?.model || auxiliary?.main?.model || ''
+      setInfo(modelInfo || {})
       setProviders(mergedProviders)
-      setAux(auxiliary.tasks ?? [])
+      setAux(auxiliary?.tasks ?? [])
       setProvider(currentProvider)
       setModel(currentModel)
-      setAuxDraft(Object.fromEntries((auxiliary.tasks ?? []).map((row) => [row.task, { provider: row.provider, model: row.model }])))
+      setAuxDraft(Object.fromEntries((auxiliary?.tasks ?? []).map((row) => [row.task, { provider: row.provider, model: row.model }])))
       setState('ready')
     } catch (e: any) {
       setError(e.message)

@@ -136,6 +136,20 @@ DEFAULT_MODELS = [
     ModelDef(id="openrouter-auto", display_name="OpenRouter Auto", provider="openrouter", tier="standard", context_length=200000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM", "COMPLEX"], description="OpenRouter — auto-select best model"),
     # ── Open-source local ──────────────────────────────────────────────────
     ModelDef(id="minicpmv4.6", display_name="MiniCPM V4.6", provider="openbmb", tier="budget", context_length=8000, capabilities={"vision": True, "tool_calling": False, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="OpenBMB MiniCPM — local vision model"),
+    # ── Local / Self-hosted ────────────────────────────────────────────────
+    ModelDef(id="llama-3.3-70b", display_name="Llama 3.3 70B", provider="ollama", tier="premium", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="Meta Llama 3.3 70B — local via Ollama"),
+    ModelDef(id="qwen2.5-72b", display_name="Qwen 2.5 72B", provider="ollama", tier="premium", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["MEDIUM", "COMPLEX"], description="Alibaba Qwen 2.5 72B — local via Ollama"),
+    ModelDef(id="deepseek-coder-33b", display_name="DeepSeek Coder 33B", provider="ollama", tier="standard", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="DeepSeek Coder 33B — local code specialist"),
+    ModelDef(id="mistral-nemo", display_name="Mistral Nemo 12B", provider="ollama", tier="standard", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Mistral Nemo 12B — local via Ollama"),
+    ModelDef(id="phi-4", display_name="Phi-4 14B", provider="ollama", tier="standard", context_length=16000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Microsoft Phi-4 — local reasoning"),
+    ModelDef(id="gemma-3-27b", display_name="Gemma 3 27B", provider="ollama", tier="standard", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="Google Gemma 3 27B — local via Ollama"),
+    ModelDef(id="llama-3.2-3b", display_name="Llama 3.2 3B", provider="ollama", tier="budget", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="Meta Llama 3.2 3B — lightweight local"),
+    ModelDef(id="qwen2.5-7b", display_name="Qwen 2.5 7B", provider="ollama", tier="budget", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="Alibaba Qwen 2.5 7B — compact local"),
+    ModelDef(id="granite-3.1-8b", display_name="Granite 3.1 8B", provider="ollama", tier="budget", context_length=128000, capabilities={"vision": False, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE"], description="IBM Granite 3.1 8B — enterprise local"),
+    # LM Studio / vLLM / LocalAI 通用条目
+    ModelDef(id="local-model", display_name="Local Model (自定义)", provider="lmstudio", tier="standard", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="LM Studio 本地模型 — 自动检测"),
+    ModelDef(id="vllm-model", display_name="vLLM Model (自部署)", provider="vllm", tier="premium", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM", "COMPLEX"], description="vLLM 自部署模型"),
+    ModelDef(id="localai-model", display_name="LocalAI Model (自部署)", provider="localai", tier="standard", context_length=128000, capabilities={"vision": True, "tool_calling": True, "image_gen": False, "audio_stt": False}, suitable_complexity=["SIMPLE", "MEDIUM"], description="LocalAI 自部署模型"),
 ]
 
 DEFAULT_GROUPS = [
@@ -146,6 +160,7 @@ DEFAULT_GROUPS = [
     ModelGroup(id="tool_calling", name="Tool-Calling", dimension="capability", filter={"tool_calling": True}),
     ModelGroup(id="reasoning", name="Reasoning Models", dimension="scenario", model_ids=["o3-mini", "o4-mini", "deepseek-r1", "grok-3"]),
     ModelGroup(id="code_specialist", name="Code Specialists", dimension="scenario", model_ids=["deepseek-coder", "codestral", "qwen-coder"]),
+    ModelGroup(id="local_deploy", name="本地部署 (Local)", dimension="scenario", model_ids=["llama-3.3-70b", "qwen2.5-72b", "deepseek-coder-33b", "mistral-nemo", "phi-4", "gemma-3-27b", "llama-3.2-3b", "qwen2.5-7b", "granite-3.1-8b", "local-model", "vllm-model", "localai-model"]),
 ]
 
 DEFAULT_PROVIDERS = [
@@ -160,7 +175,12 @@ DEFAULT_PROVIDERS = [
     ModelProvider(id="alibaba", name="Alibaba Cloud", api_base="https://dashscope.aliyuncs.com/compatible-mode/v1", api_key_ref="${DASHSCOPE_API_KEY}"),
     ModelProvider(id="openrouter", name="OpenRouter", api_base="https://openrouter.ai/api/v1", api_key_ref="${OPENROUTER_API_KEY}"),
     ModelProvider(id="openbmb", name="OpenBMB", api_base="", api_key_ref=""),
-    ModelProvider(id="custom", name="Custom", api_base="", api_key_ref=""),
+    ModelProvider(id="ollama", name="Ollama (本地)", api_base="http://localhost:11434/v1", api_key_ref=""),
+    ModelProvider(id="lmstudio", name="LM Studio (本地)", api_base="http://localhost:1234/v1", api_key_ref=""),
+    ModelProvider(id="vllm", name="vLLM (自部署)", api_base="http://localhost:8000/v1", api_key_ref=""),
+    ModelProvider(id="localai", name="LocalAI (自部署)", api_base="http://localhost:8080/v1", api_key_ref=""),
+    ModelProvider(id="llamacpp", name="llama.cpp Server (本地)", api_base="http://localhost:8081/v1", api_key_ref=""),
+    ModelProvider(id="custom", name="Custom (自定义端点)", api_base="", api_key_ref=""),
 ]
 
 

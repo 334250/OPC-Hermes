@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 export default function AgentDetail() {
+  const { t } = useI18n()
   const { agentId } = useParams<{ agentId: string }>()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -14,13 +16,13 @@ export default function AgentDetail() {
   }, [agentId])
 
   if (loading) return <div className="card animate-pulse"><div className="h-64 bg-opc-surface-2 rounded" /></div>
-  if (!data) return <div className="text-opc-text-2">Agent not found</div>
+  if (!data) return <div className="text-opc-text-2">{t('agentNotFound')}</div>
 
   const agent = data.agent
 
   return (
     <div>
-      <Link to="/agents" className="text-sm text-opc-text-2 hover:text-opc-text mb-4 inline-block">← Back to Agents</Link>
+      <Link to="/agents" className="text-sm text-opc-text-2 hover:text-opc-text mb-4 inline-block">← {t('backToAgents')}</Link>
       <div className="flex items-center gap-4 mb-6">
         <span className="text-3xl">{roleIcon(agent.role)}</span>
         <div>
@@ -29,7 +31,7 @@ export default function AgentDetail() {
         </div>
         <div className="ml-auto text-right">
           <div className="text-2xl font-semibold text-opc-accent">{agent.quality_score > 0 ? `${(agent.quality_score * 100).toFixed(0)}%` : '—'}</div>
-          <div className="text-xs text-opc-text-2">Quality Score</div>
+          <div className="text-xs text-opc-text-2">{t('qualityScore')}</div>
         </div>
       </div>
 
@@ -37,26 +39,26 @@ export default function AgentDetail() {
 
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-3 mb-6">
-        <StatBox label="Tasks" value={agent.total_tasks} />
-        <StatBox label="Success Rate" value={agent.success_rate ? `${(agent.success_rate * 100).toFixed(0)}%` : '—'} />
-        <StatBox label="Model" value={agent.default_model || 'default'} />
-        <StatBox label="Skills" value={agent.skill_ids?.length ?? 0} />
+        <StatBox label={t('tasks')} value={agent.total_tasks} />
+        <StatBox label={t('success')} value={agent.success_rate ? `${(agent.success_rate * 100).toFixed(0)}%` : '—'} />
+        <StatBox label={t('model')} value={agent.default_model || 'default'} />
+        <StatBox label={t('skills')} value={agent.skill_ids?.length ?? 0} />
       </div>
 
       {/* Skills */}
       <div className="card mb-6">
-        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">Skills</h3>
+        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">{t('skills')}</h3>
         <div className="flex flex-wrap gap-2">
           {data.skills?.map((s: any) => (
             <span key={s.id} className="badge-accent cursor-default" title={s.description}>{s.display_name}</span>
           ))}
-          {!data.skills?.length && <span className="text-xs text-opc-text-2">No skills</span>}
+          {!data.skills?.length && <span className="text-xs text-opc-text-2">{t('noSkills')}</span>}
         </div>
       </div>
 
       {/* Evaluations */}
       <div className="card mb-6">
-        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">Recent Evaluations</h3>
+        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">{t('recentEvaluations')}</h3>
         {data.evaluations?.length ? (
           <div className="space-y-2">
             {data.evaluations.slice(0, 10).map((e: any) => {
@@ -77,13 +79,13 @@ export default function AgentDetail() {
             })}
           </div>
         ) : (
-          <div className="py-8 text-center text-opc-text-2 text-sm">No evaluations yet</div>
+          <div className="py-8 text-center text-opc-text-2 text-sm">{t('noEvaluationsYet')}</div>
         )}
       </div>
 
       {/* Score Trend */}
       <div className="card">
-        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">Score Trend</h3>
+        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">{t('scoreTrend')}</h3>
         {data.score_trend?.length ? (
           <div className="h-32 flex items-end gap-0.5">
             {data.score_trend.slice(-30).map((d: any, i: number) => (
@@ -96,7 +98,7 @@ export default function AgentDetail() {
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-opc-text-2 text-sm">No trend data</div>
+          <div className="py-8 text-center text-opc-text-2 text-sm">{t('noTrendData')}</div>
         )}
       </div>
     </div>

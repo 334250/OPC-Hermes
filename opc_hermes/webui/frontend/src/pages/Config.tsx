@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 export default function Config() {
+  const { t } = useI18n()
   const [config, setConfig] = useState<any>(null)
   const [edited, setEdited] = useState('')
   const [loading, setLoading] = useState(true)
@@ -20,12 +22,12 @@ export default function Config() {
       const parsed = JSON.parse(edited)
       setSaving(true)
       api.updateConfig(parsed).then(() => {
-        setMessage('Saved!')
+        setMessage(t('saved'))
         setTimeout(() => setMessage(''), 2000)
       }).catch(e => setMessage(`Error: ${e.message}`))
       .finally(() => setSaving(false))
     } catch {
-      setMessage('Invalid JSON')
+      setMessage(t('invalidJson'))
     }
   }
 
@@ -34,10 +36,10 @@ export default function Config() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Configuration</h2>
+        <h2 className="text-xl font-semibold">{t('configuration')}</h2>
         <div className="flex items-center gap-3">
           {message && <span className={`text-xs ${message.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{message}</span>}
-          <button onClick={save} className="btn-primary text-xs" disabled={saving}>Save</button>
+          <button onClick={save} className="btn-primary text-xs" disabled={saving}>{t('save')}</button>
         </div>
       </div>
 

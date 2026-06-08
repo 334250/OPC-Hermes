@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 const statusTabs = [
-  { key: 'pending', label: 'Pending' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'applied', label: 'Applied' },
+  { key: 'pending', labelKey: 'pending' },
+  { key: 'approved', labelKey: 'approved' },
+  { key: 'applied', labelKey: 'applied' },
 ]
 
 export default function Proposals() {
+  const { t } = useI18n()
   const [status, setStatus] = useState('pending')
   const [proposals, setProposals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,23 +33,23 @@ export default function Proposals() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Optimization Proposals</h2>
+        <h2 className="text-xl font-semibold">{t('optimizationProposals')}</h2>
         <button onClick={() => api.triggerOptimizerScan().then(fetch)} className="btn-secondary text-xs">
-          Run Scan Now
+          {t('runScanNow')}
         </button>
       </div>
 
       {/* Status tabs */}
       <div className="flex gap-1 mb-6">
-        {statusTabs.map(t => (
+        {statusTabs.map(tab => (
           <button
-            key={t.key}
-            onClick={() => setStatus(t.key)}
+            key={tab.key}
+            onClick={() => setStatus(tab.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              status === t.key ? 'bg-opc-accent text-white' : 'bg-opc-surface-2 text-opc-text-2 hover:text-opc-text'
+              status === tab.key ? 'bg-opc-accent text-white' : 'bg-opc-surface-2 text-opc-text-2 hover:text-opc-text'
             }`}
           >
-            {t.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -71,16 +73,16 @@ export default function Proposals() {
                   <div className="flex gap-4 text-xs text-opc-text-2">
                     <span>Worker: {p.worker_id}</span>
                     <span>Created: {p.created_at?.slice(0, 10)}</span>
-                    {p.evidence?.avg_quality && <span>Avg Quality: {(p.evidence.avg_quality * 100).toFixed(0)}%</span>}
+                    {p.evidence?.avg_quality && <span>{t('avgQuality')}: {(p.evidence.avg_quality * 100).toFixed(0)}%</span>}
                   </div>
                 </div>
                 {status === 'pending' && (
                   <div className="flex gap-2 ml-4">
                     <button onClick={() => handleAction(p.id, 'approve')} disabled={actionLoading === p.id} className="btn-primary text-xs">
-                      Approve
+                      {t('approve')}
                     </button>
                     <button onClick={() => handleAction(p.id, 'reject')} disabled={actionLoading === p.id} className="btn-danger text-xs">
-                      Reject
+                      {t('reject')}
                     </button>
                   </div>
                 )}
@@ -89,7 +91,7 @@ export default function Proposals() {
           ))}
         </div>
       ) : (
-        <div className="py-16 text-center text-opc-text-2 text-sm">No {status} proposals</div>
+        <div className="py-16 text-center text-opc-text-2 text-sm">{t('noProposals')}</div>
       )}
     </div>
   )

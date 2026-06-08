@@ -52,11 +52,9 @@ class KnowledgePipeline:
 
     def __init__(self, upload_dir: Optional[Path] = None):
         if upload_dir is None:
-            try:
-                from hermes_constants import get_hermes_home
-                upload_dir = get_hermes_home() / "opc" / "uploads"
-            except ImportError:
-                upload_dir = Path.home() / ".hermes" / "opc" / "uploads"
+            from opc_hermes.config.loader import get_opc_home
+
+            upload_dir = get_opc_home() / "uploads"
         self._upload_dir = Path(upload_dir)
         self._upload_dir.mkdir(parents=True, exist_ok=True)
 

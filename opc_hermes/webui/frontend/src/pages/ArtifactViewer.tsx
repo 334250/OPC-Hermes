@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 export default function ArtifactViewer() {
+  const { t } = useI18n()
   const [taskId, setTaskId] = useState('')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -19,17 +21,17 @@ export default function ArtifactViewer() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">Artifact Viewer</h2>
+      <h2 className="text-xl font-semibold mb-6">{t('artifacts')}</h2>
 
       <div className="flex gap-3 mb-6">
         <input
           className="input flex-1 max-w-md"
-          placeholder="Enter task ID..."
+          placeholder={t('enterTaskId')}
           value={taskId}
           onChange={e => setTaskId(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && lookup()}
         />
-        <button onClick={lookup} className="btn-primary" disabled={loading}>Lookup</button>
+        <button onClick={lookup} className="btn-primary" disabled={loading}>{t('lookup')}</button>
       </div>
 
       {error && <div className="card border-red-500/30 bg-red-500/5 mb-6"><p className="text-red-400 text-sm">{error}</p></div>}
@@ -52,7 +54,7 @@ export default function ArtifactViewer() {
           ))}
         </div>
       ) : (
-        !loading && <div className="py-16 text-center text-opc-text-2 text-sm">Enter a task ID to browse artifacts</div>
+        !loading && <div className="py-16 text-center text-opc-text-2 text-sm">{t('browseArtifactsHint')}</div>
       )}
     </div>
   )

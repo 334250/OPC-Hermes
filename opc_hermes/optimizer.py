@@ -64,11 +64,9 @@ class Optimizer:
 
     def __init__(self, proposals_dir: Optional[Path] = None):
         if proposals_dir is None:
-            try:
-                from hermes_constants import get_hermes_home
-                proposals_dir = get_hermes_home() / "opc" / "proposals"
-            except ImportError:
-                proposals_dir = Path.home() / ".hermes" / "opc" / "proposals"
+            from opc_hermes.config.loader import get_opc_home
+
+            proposals_dir = get_opc_home() / "proposals"
         self._proposals_dir = Path(proposals_dir)
         self._proposals_dir.mkdir(parents=True, exist_ok=True)
 

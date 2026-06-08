@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 export default function TaskDetail() {
+  const { t } = useI18n()
   const [taskId, setTaskId] = useState('')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -19,18 +21,18 @@ export default function TaskDetail() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">Task Detail</h2>
+      <h2 className="text-xl font-semibold mb-6">{t('taskDetail')}</h2>
 
       <div className="flex gap-3 mb-6">
         <input
           className="input flex-1 max-w-md"
-          placeholder="Enter task ID..."
+          placeholder={t('enterTaskId')}
           value={taskId}
           onChange={e => setTaskId(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && lookup()}
         />
         <button onClick={lookup} className="btn-primary" disabled={loading}>
-          {loading ? 'Loading...' : 'Lookup'}
+          {loading ? t('loading') : t('lookup')}
         </button>
       </div>
 
@@ -41,7 +43,7 @@ export default function TaskDetail() {
           {/* DAG */}
           {data.dag?.nodes?.length > 0 && (
             <div className="card mb-6">
-              <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-4">Workflow DAG</h3>
+              <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-4">{t('workflowDag')}</h3>
               <div className="flex flex-wrap gap-4 items-center">
                 {data.dag.nodes.map((node: any, i: number) => (
                   <div key={node.id} className="flex items-center gap-2">
@@ -63,21 +65,21 @@ export default function TaskDetail() {
           )}
 
           {/* Steps */}
-          <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">Steps ({data.steps?.length ?? 0})</h3>
+          <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-3">{t('steps')} ({data.steps?.length ?? 0})</h3>
           <div className="space-y-3">
             {data.steps?.map((step: any) => (
               <div key={step.step_index} className="card">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Step {step.step_index}: {step.worker_id}</span>
+                  <span className="text-sm font-medium">{t('step')} {step.step_index}: {step.worker_id}</span>
                   <span className={`badge-${step.reports?.[0]?.status === 'completed' ? 'success' : step.reports?.[0]?.status === 'failed' ? 'error' : 'info'} text-xs`}>
                     {step.reports?.[0]?.status ?? 'unknown'}
                   </span>
                 </div>
                 <p className="text-xs text-opc-text-2 mb-2">{step.prompt?.slice(0, 300)}</p>
                 <div className="flex gap-3 text-xs text-opc-text-2">
-                  <span>Complexity: {step.complexity}</span>
-                  <span>Model: {step.model || 'default'}</span>
-                  <span>Output format: {step.expected_output_format}</span>
+                  <span>{t('complexity')}: {step.complexity}</span>
+                  <span>{t('model')}: {step.model || 'default'}</span>
+                  <span>{t('outputFormat')}: {step.expected_output_format}</span>
                 </div>
                 {step.reports?.map((r: any) => r.output_preview && (
                   <pre key={r.reported_at} className="mt-3 p-3 bg-opc-bg rounded-lg text-xs text-opc-text-2 overflow-auto max-h-40">{r.output_preview}</pre>

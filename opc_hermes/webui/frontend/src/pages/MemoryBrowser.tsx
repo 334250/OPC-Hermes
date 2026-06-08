@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 const partitions = [
-  { key: 'project', label: 'Project Memory' },
-  { key: 'eval', label: 'Eval Memory' },
-  { key: 'kb', label: 'Knowledge Base' },
+  { key: 'project', labelKey: 'projectMemory' },
+  { key: 'eval', labelKey: 'evalMemory' },
+  { key: 'kb', labelKey: 'knowledgeBase' },
 ]
 
 export default function MemoryBrowser() {
+  const { t } = useI18n()
   const [partition, setPartition] = useState('eval')
   const [taskId, setTaskId] = useState('')
   const [workerId, setWorkerId] = useState('')
@@ -30,7 +32,7 @@ export default function MemoryBrowser() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">Memory Browser</h2>
+      <h2 className="text-xl font-semibold mb-6">{t('memory')}</h2>
 
       {/* Partition tabs */}
       <div className="flex gap-1 mb-4">
@@ -42,7 +44,7 @@ export default function MemoryBrowser() {
               partition === p.key ? 'bg-opc-accent text-white' : 'bg-opc-surface-2 text-opc-text-2 hover:text-opc-text'
             }`}
           >
-            {p.label}
+            {t(p.labelKey)}
           </button>
         ))}
       </div>
@@ -53,12 +55,12 @@ export default function MemoryBrowser() {
           <input className="input max-w-xs" placeholder="Task ID" value={taskId} onChange={e => setTaskId(e.target.value)} />
         )}
         {partition === 'eval' && (
-          <input className="input max-w-xs" placeholder="Worker ID (optional)" value={workerId} onChange={e => setWorkerId(e.target.value)} />
+          <input className="input max-w-xs" placeholder={t('workerIdOptional')} value={workerId} onChange={e => setWorkerId(e.target.value)} />
         )}
         {partition === 'kb' && (
-          <input className="input flex-1 max-w-sm" placeholder="Search knowledge base..." value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && browse()} />
+          <input className="input flex-1 max-w-sm" placeholder={t('searchKnowledge')} value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && browse()} />
         )}
-        <button onClick={browse} className="btn-primary" disabled={loading}>Browse</button>
+        <button onClick={browse} className="btn-primary" disabled={loading}>{t('browse')}</button>
       </div>
 
       {/* Results */}
@@ -81,7 +83,7 @@ export default function MemoryBrowser() {
               </div>
             </div>
           ))}
-          {!data.evaluations?.length && <EmptyState message="No evaluations found" />}
+          {!data.evaluations?.length && <EmptyState message={t('noEvaluationsFound')} />}
         </div>
       )}
 
@@ -93,7 +95,7 @@ export default function MemoryBrowser() {
               <div className="text-xs text-opc-text-2 mt-1">{p.prompt?.slice(0, 200)}</div>
             </div>
           ))}
-          {!data.protocols?.length && !data.reports?.length && <EmptyState message="No project data for this task" />}
+          {!data.protocols?.length && !data.reports?.length && <EmptyState message={t('noProjectData')} />}
         </div>
       )}
 
@@ -105,7 +107,7 @@ export default function MemoryBrowser() {
               <div className="text-xs text-opc-text-2 mt-1">{r.content?.slice(0, 300)}</div>
             </div>
           ))}
-          {!data.results?.length && <EmptyState message="No knowledge entries found" />}
+          {!data.results?.length && <EmptyState message={t('noKnowledgeEntries')} />}
         </div>
       )}
     </div>

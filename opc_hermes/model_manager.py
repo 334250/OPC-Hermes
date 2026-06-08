@@ -160,11 +160,9 @@ class ModelManager:
 
     def __init__(self, data_dir: Optional[Path] = None):
         if data_dir is None:
-            try:
-                from hermes_constants import get_hermes_home
-                data_dir = get_hermes_home() / "opc" / "models"
-            except ImportError:
-                data_dir = Path.home() / ".hermes" / "opc" / "models"
+            from opc_hermes.config.loader import get_opc_home
+
+            data_dir = get_opc_home() / "models"
         self._data_dir = Path(data_dir)
         self._data_dir.mkdir(parents=True, exist_ok=True)
         self._seed_defaults()

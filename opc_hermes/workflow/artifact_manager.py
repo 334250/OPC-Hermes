@@ -35,11 +35,9 @@ class ArtifactManager:
 
     def __init__(self, base_dir: Optional[Path] = None):
         if base_dir is None:
-            try:
-                from hermes_constants import get_hermes_home
-                base_dir = get_hermes_home() / "opc" / "artifacts"
-            except ImportError:
-                base_dir = Path.home() / ".hermes" / "opc" / "artifacts"
+            from opc_hermes.config.loader import get_opc_home
+
+            base_dir = get_opc_home() / "artifacts"
         self._base_dir = Path(base_dir)
         self._base_dir.mkdir(parents=True, exist_ok=True)
 

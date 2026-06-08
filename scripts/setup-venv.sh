@@ -89,6 +89,9 @@ echo ""
 log "安装核心依赖..."
 
 pip install -e "$PROJECT_ROOT" -q
+if [ -d "$PROJECT_ROOT/hermes-agent" ]; then
+    pip install -e "$PROJECT_ROOT/hermes-agent[pty]" -q
+fi
 
 if $WITH_WEBUI; then
     log "安装 WebUI 依赖 (fastapi, uvicorn)..."

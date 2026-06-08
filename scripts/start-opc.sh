@@ -86,6 +86,34 @@ check_deps() {
     fi
 }
 
+ensure_frontend_build() {
+    FRONTEND_DIR="$PROJECT_ROOT/opc_hermes/webui/frontend"
+    FRONTEND_DIST="$FRONTEND_DIR/dist/index.html"
+
+    if [ -f "$FRONTEND_DIST" ]; then
+        log "前端构建产物已存在"
+        return
+    fi
+
+    if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+        warn "前端目录未找到，后端将只提供 API: $FRONTEND_DIR"
+        return
+    fi
+
+    if ! command -v npm &>/dev/null; then
+        warn "npm 未安装，无法构建前端；请安装 Node.js 或使用 --full 启动前端开发服务器。"
+        return
+    fi
+
+    info "首次启动需要构建 WebUI 前端..."
+    if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+        info "安装前端依赖..."
+        (cd "$FRONTEND_DIR" && npm install --no-package-lock --silent)
+    fi
+    (cd "$FRONTEND_DIR" && npm run build)
+    log "前端构建完成"
+}
+
 # ── 初始化数据 ──────────────────────────────────────────────────────
 seed_data() {
     info "初始化 OPC-Hermes 默认数据..."
@@ -114,10 +142,10 @@ print('默认数据初始化完成。')
 start_backend() {
     info "启动 OPC WebUI 后端 (http://$OPC_HOST:$OPC_PORT)..."
     echo ""
-    "$VENV_PYTHON" -c "
+    OPC_WEBUI_HOST="$OPC_HOST" OPC_WEBUI_PORT="$OPC_PORT" "$VENV_PYTHON" -c "
 import sys; sys.path.insert(0, '$PROJECT_ROOT')
 from opc_hermes.webui.server import main
-main()
+main(host='$OPC_HOST', port=$OPC_PORT)
 " &
     BACKEND_PID=$!
     sleep 2
@@ -149,7 +177,7 @@ start_frontend() {
     fi
 
     info "安装前端依赖..."
-    (cd "$FRONTEND_DIR" && npm install --silent 2>&1 | tail -1)
+    (cd "$FRONTEND_DIR" && npm install --no-package-lock --silent 2>&1 | tail -1)
     log "依赖安装完成"
 
     info "启动前端开发服务器 (http://localhost:5173)..."
@@ -197,6 +225,10 @@ main() {
 
     if $seed || $full; then
         seed_data
+    fi
+
+    if ! $full; then
+        ensure_frontend_build
     fi
 
     if $full || ! $frontend_only; then

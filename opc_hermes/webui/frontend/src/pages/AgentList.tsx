@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 const roleFilters = [
-  { label: 'All', value: '' },
-  { label: 'Leader', value: 'leader' },
-  { label: 'Worker', value: 'worker' },
-  { label: 'Evaluator', value: 'evaluator' },
+  { labelKey: 'all', value: '' },
+  { labelKey: 'leader', value: 'leader' },
+  { labelKey: 'worker', value: 'worker' },
+  { labelKey: 'evaluator', value: 'evaluator' },
 ]
 
 export default function AgentList() {
+  const { t } = useI18n()
   const [agents, setAgents] = useState<any[]>([])
   const [role, setRole] = useState('')
   const [search, setSearch] = useState('')
@@ -30,13 +32,13 @@ export default function AgentList() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">Agents</h2>
+      <h2 className="text-xl font-semibold mb-6">{t('agents')}</h2>
 
       {/* Filters */}
       <div className="flex gap-3 mb-6">
         <input
           className="input flex-1 max-w-sm"
-          placeholder="Search agents..."
+          placeholder={t('searchAgents')}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -49,7 +51,7 @@ export default function AgentList() {
                 role === r.value ? 'bg-opc-accent text-white' : 'bg-opc-surface-2 text-opc-text-2 hover:text-opc-text'
               }`}
             >
-              {r.label}
+              {t(r.labelKey)}
             </button>
           ))}
         </div>
@@ -75,16 +77,16 @@ export default function AgentList() {
             </div>
             <p className="text-xs text-opc-text-2 line-clamp-2">{agent.description}</p>
             <div className="flex gap-2 mt-3 text-xs text-opc-text-2">
-              <span>{agent.skill_ids?.length ?? 0} skills</span>
+              <span>{agent.skill_ids?.length ?? 0} {t('skills')}</span>
               <span>·</span>
-              <span>{agent.success_rate ? `${(agent.success_rate * 100).toFixed(0)}% success` : 'No data'}</span>
+              <span>{agent.success_rate ? `${(agent.success_rate * 100).toFixed(0)}% ${t('success')}` : t('noData')}</span>
             </div>
           </Link>
         ))}
       </div>
 
       {filtered.length === 0 && !loading && (
-        <div className="py-16 text-center text-opc-text-2 text-sm">No agents found</div>
+        <div className="py-16 text-center text-opc-text-2 text-sm">{t('noAgentsFound')}</div>
       )}
     </div>
   )

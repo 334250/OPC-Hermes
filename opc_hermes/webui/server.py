@@ -19,22 +19,26 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import Body, FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
+    from starlette.exceptions import HTTPException as StarletteHTTPException
     HAS_FASTAPI = True
 except ImportError:
     HAS_FASTAPI = False
+    Body = None  # type: ignore
     FastAPI = None  # type: ignore
     HTTPException = Exception  # type: ignore
     CORSMiddleware = None  # type: ignore
     StaticFiles = None  # type: ignore
+    StarletteHTTPException = Exception  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +64,52 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_HERMES_WEB_SERVER: Any = None
+
+
+def _mount_hermes_api() -> None:
+    """Mount Hermes Agent's native dashboard API in this FastAPI process.
+
+    OPC-Hermes serves its own React app, but the dashboard should reuse Hermes
+    Agent's native operational capabilities without starting a second frontend.
+    Mounting the API under an internal prefix keeps OPC's /api routes stable.
+    """
+    project_root = Path(__file__).resolve().parents[2]
+    hermes_root = project_root / "hermes-agent"
+    if not hermes_root.exists():
+        logger.warning("Hermes Agent source not found at %s; native API not mounted", hermes_root)
+        return
+    if str(hermes_root) not in sys.path:
+        sys.path.insert(0, str(hermes_root))
+    try:
+        from hermes_cli import web_server as hermes_web_server  # type: ignore
+    except Exception:
+        logger.exception("Failed to import Hermes Agent Web API")
+        return
+
+    global _HERMES_WEB_SERVER
+    _HERMES_WEB_SERVER = hermes_web_server
+    hermes_web_server._DASHBOARD_EMBEDDED_CHAT_ENABLED = True
+    hermes_app = hermes_web_server.app
+    hermes_app.state.auth_required = False
+    app.mount("/hermes-api", hermes_app)
+
+
+_mount_hermes_api()
+
+
+@app.get("/api/hermes/chat-config")
+async def hermes_chat_config():
+    """Return the local WebSocket config needed for native Hermes Chat."""
+    if _HERMES_WEB_SERVER is None:
+        raise HTTPException(503, "Hermes Agent Web API is not mounted")
+    return {
+        "enabled": bool(getattr(_HERMES_WEB_SERVER, "_DASHBOARD_EMBEDDED_CHAT_ENABLED", False)),
+        "token": getattr(_HERMES_WEB_SERVER, "_SESSION_TOKEN", ""),
+        "pty_path": "/hermes-api/api/pty",
+        "events_path": "/hermes-api/api/events",
+    }
 
 # ══════════════════════════════════════════════════════════════════════════
 # Helpers
@@ -734,10 +784,22 @@ async def search_knowledge(q: str = "", limit: int = 20):
 
 
 @app.post("/api/knowledge/ingest")
-async def ingest_knowledge(title: str, content: str, tags: Optional[str] = None):
+async def ingest_knowledge(payload: Dict[str, Any] = Body(...)):
     from opc_hermes.knowledge_pipeline import KnowledgePipeline
+
+    title = str(payload.get("title", "")).strip()
+    content = str(payload.get("content", "")).strip()
+    tags = payload.get("tags", "")
+    if not title:
+        raise HTTPException(400, "Knowledge title is required.")
+    if not content:
+        raise HTTPException(400, "Knowledge content is required.")
+
     kp = KnowledgePipeline()
-    tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
+    if isinstance(tags, list):
+        tag_list = [str(t).strip() for t in tags if str(t).strip()]
+    else:
+        tag_list = [t.strip() for t in str(tags or "").split(",") if t.strip()]
     result = kp.ingest_text(title, content, tags=tag_list)
     return result
 
@@ -851,20 +913,32 @@ async def health():
 FRONTEND_DIR = Path(__file__).parent / "frontend" / "dist"
 
 if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+    class SPAStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope):
+            try:
+                return await super().get_response(path, scope)
+            except StarletteHTTPException as exc:
+                if exc.status_code == 404:
+                    return await super().get_response("index.html", scope)
+                raise
+
+    app.mount("/", SPAStaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════
 
-def main():
+def main(host: Optional[str] = None, port: Optional[int] = None, reload: bool = False):
     import uvicorn
+
+    resolved_host = host or os.environ.get("OPC_WEBUI_HOST", "127.0.0.1")
+    resolved_port = int(port or os.environ.get("OPC_WEBUI_PORT", "8765"))
     uvicorn.run(
         "opc_hermes.webui.server:app",
-        host="127.0.0.1",
-        port=8765,
-        reload=True,
+        host=resolved_host,
+        port=resolved_port,
+        reload=reload,
         log_level="info",
     )
 

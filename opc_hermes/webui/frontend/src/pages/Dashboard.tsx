@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 export default function Dashboard() {
+  const { t } = useI18n()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -17,20 +19,20 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">Dashboard</h2>
+      <h2 className="text-xl font-semibold mb-6">{t('dashboard')}</h2>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Active Tasks" value={stats.active_tasks ?? 0} />
-        <StatCard label="Total Workers" value={stats.total_workers ?? 0} />
-        <StatCard label="Avg Quality" value={stats.avg_quality ? `${(stats.avg_quality * 100).toFixed(0)}%` : '—'} />
-        <StatCard label="Pending Proposals" value={stats.pending_proposals ?? 0} />
-        <StatCard label="Recent Evaluations" value={stats.recent_evaluations ?? 0} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
+        <StatCard label={t('activeTasks')} value={stats.active_tasks ?? 0} />
+        <StatCard label={t('totalWorkers')} value={stats.total_workers ?? 0} />
+        <StatCard label={t('avgQuality')} value={stats.avg_quality ? `${(stats.avg_quality * 100).toFixed(0)}%` : '—'} />
+        <StatCard label={t('pendingProposals')} value={stats.pending_proposals ?? 0} />
+        <StatCard label={t('recentEvaluations')} value={stats.recent_evaluations ?? 0} />
       </div>
 
       {/* Quality Trend */}
       <div className="card mb-6">
-        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-4">Quality Trend (30 days)</h3>
+        <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider mb-4">{t('qualityTrend')}</h3>
         {data?.quality_trend?.length ? (
           <div className="h-48 flex items-end gap-1">
             {data.quality_trend.slice(-30).map((e: any, i: number) => {
@@ -48,7 +50,7 @@ export default function Dashboard() {
             })}
           </div>
         ) : (
-          <EmptyState message="No evaluation data yet" />
+          <EmptyState message={t('noEvaluationData')} />
         )}
       </div>
     </div>
@@ -65,10 +67,11 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 }
 
 function ErrorCard({ message }: { message: string }) {
+  const { t } = useI18n()
   return (
     <div className="card border-opc-error/50 bg-opc-error/5">
-      <p className="text-red-400 text-sm">Failed to load: {message}</p>
-      <button onClick={() => window.location.reload()} className="btn-primary mt-3 text-xs">Retry</button>
+      <p className="text-red-400 text-sm">{t('failedToLoad')}: {message}</p>
+      <button onClick={() => window.location.reload()} className="btn-primary mt-3 text-xs">{t('retry')}</button>
     </div>
   )
 }
@@ -77,7 +80,7 @@ function DashboardSkeleton() {
   return (
     <div>
       <div className="h-7 w-40 bg-opc-surface-2 rounded mb-6 animate-pulse" />
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="card animate-pulse">
             <div className="h-8 w-16 bg-opc-surface-2 rounded mb-2" />

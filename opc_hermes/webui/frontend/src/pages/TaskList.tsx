@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 export default function TaskList() {
+  const { t } = useI18n()
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getTask('_list_')
-      .catch(() => {}) // ignore error, use tasks endpoint
     fetchTasks()
   }, [])
 
   const fetchTasks = () => {
     setLoading(true)
     setError(null)
-    fetch('/api/tasks')
-      .then(r => r.json())
+    api.listTasks()
       .then(d => setTasks(d.tasks ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -25,12 +24,12 @@ export default function TaskList() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">Tasks</h2>
+      <h2 className="text-xl font-semibold mb-6">{t('tasks')}</h2>
 
       {error && (
         <div className="card border-red-500/30 bg-red-500/5 mb-6">
           <p className="text-red-400 text-sm">{error}</p>
-          <button onClick={fetchTasks} className="btn-primary mt-3 text-xs">Retry</button>
+          <button onClick={fetchTasks} className="btn-primary mt-3 text-xs">{t('retry')}</button>
         </div>
       )}
 
@@ -53,7 +52,7 @@ export default function TaskList() {
                     {task.task_id}
                   </div>
                   <div className="text-xs text-opc-text-2 mt-1">
-                    {task.total_steps} steps · {task.workers?.join(', ')}
+                    {task.total_steps} {t('steps')} · {task.workers?.join(', ')}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -69,7 +68,7 @@ export default function TaskList() {
         </div>
       ) : (
         <div className="py-16 text-center text-opc-text-2 text-sm">
-          No tasks found. Tasks appear here after a Worker completes and the Evaluator runs.
+          {t('noTasksFound')}
         </div>
       )}
     </div>

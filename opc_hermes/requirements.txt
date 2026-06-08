@@ -12,3 +12,4 @@ chromadb>=0.4.0,<0.7
 # WebUI (Phase 4)
 # fastapi — already in Hermes [web] extra
 # uvicorn — already in Hermes [web] extra
+websockets>=12

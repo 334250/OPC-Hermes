@@ -3,7 +3,7 @@
 # OPC-Hermes 启动脚本
 # ─────────────────────────────────────────────────────────────────────
 # 用法:
-#   ./scripts/start-opc.sh              # 启动 OPC WebUI + Hermes Agent
+#   ./scripts/start-opc.sh              # 启动 OPC WebUI + Hermes 网关（无前端）
 #   ./scripts/start-opc.sh --seed       # 初始化数据 + 启动全部
 #   ./scripts/start-opc.sh --full       # 初始化 + 全部 + 前端开发服务器
 #   ./scripts/start-opc.sh --no-hermes  # 仅启动 OPC WebUI（不启动 Hermes）
@@ -16,8 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OPC_PORT="${OPC_WEBUI_PORT:-8765}"
 OPC_HOST="${OPC_WEBUI_HOST:-127.0.0.1}"
-HERMES_PORT="${HERMES_DASHBOARD_PORT:-9119}"
-HERMES_HOST="${HERMES_DASHBOARD_HOST:-127.0.0.1}"
+# Hermes uses gateway mode (headless API, no frontend)
 VENV_PYTHON=""
 BACKEND_PID=""
 HERMES_PID=""
@@ -63,16 +62,14 @@ usage() {
     echo "选项:"
     echo "  --seed          首次运行：初始化默认数据 + 启动全部"
     echo "  --full          完整启动：初始化 + OPC + Hermes + 前端"
-    echo "  --no-hermes     仅启动 OPC WebUI（不启动 Hermes Agent）"
+    echo "  --no-hermes     仅启动 OPC WebUI（不启动 Hermes 后端）"
     echo "  --frontend-only 仅启动前端开发服务器"
     echo "  --port <port>   指定 OPC 后端端口（默认: 8765）"
     echo "  --help          显示此帮助"
     echo ""
     echo "环境变量:"
-    echo "  OPC_WEBUI_PORT         OPC 后端端口（默认: 8765）"
-    echo "  OPC_WEBUI_HOST         OPC 绑定地址（默认: 127.0.0.1）"
-    echo "  HERMES_DASHBOARD_PORT  Hermes 面板端口（默认: 9119）"
-    echo "  HERMES_DASHBOARD_HOST  Hermes 绑定地址（默认: 127.0.0.1）"
+    echo "  OPC_WEBUI_PORT  OPC 后端端口（默认: 8765）"
+    echo "  OPC_WEBUI_HOST  OPC 绑定地址（默认: 127.0.0.1）"
     exit 0
 }
 
@@ -142,17 +139,21 @@ start_hermes() {
         return
     fi
 
-    info "启动 Hermes Agent Dashboard (http://$HERMES_HOST:$HERMES_PORT)..."
-    "$hermes_bin" dashboard --host "$HERMES_HOST" --port "$HERMES_PORT" --insecure &
+    info "启动 Hermes Agent 后端服务 (API Server)..."
+    # Use gateway mode for headless API (no dashboard frontend)
+    "$hermes_bin" gateway &
     HERMES_PID=$!
     sleep 3
 
     if kill -0 "$HERMES_PID" 2>/dev/null; then
         log "Hermes Agent 已启动 (PID: $HERMES_PID)"
-        echo -e "  ${GREEN}▸${NC}  Hermes: ${CYAN}http://$HERMES_HOST:$HERMES_PORT${NC}"
+        echo -e "  ${GREEN}▸${NC}  Hermes API: ${CYAN}运行中${NC}（无前端）"
     else
-        warn "Hermes Agent 可能未成功启动，请手动启动: hermes dashboard --host $HERMES_HOST --port $HERMES_PORT --insecure"
-        HERMES_PID=""
+        warn "Hermes Agent 启动失败，尝试 dashboard 模式..."
+        "$hermes_bin" dashboard --host "$HERMES_HOST" --port "$HERMES_PORT" --insecure &
+        HERMES_PID=$!
+        sleep 3
+        kill -0 "$HERMES_PID" 2>/dev/null && log "Hermes Dashboard 已启动 (http://$HERMES_HOST:$HERMES_PORT)" || HERMES_PID=""
     fi
 }
 
@@ -173,7 +174,7 @@ main(host='$OPC_HOST', port=$OPC_PORT)
         echo -e "  ${GREEN}▸${NC}  WebUI:     ${CYAN}http://$OPC_HOST:$OPC_PORT${NC}"
         echo -e "  ${GREEN}▸${NC}  API:       ${CYAN}http://$OPC_HOST:$OPC_PORT/api/health${NC}"
         echo -e "  ${GREEN}▸${NC}  API 文档:  ${CYAN}http://$OPC_HOST:$OPC_PORT/docs${NC}"
-        [ -n "$HERMES_PID" ] && echo -e "  ${GREEN}▸${NC}  Hermes:    ${CYAN}http://$HERMES_HOST:$HERMES_PORT${NC}"
+        [ -n "$HERMES_PID" ] && echo -e "  ${GREEN}▸${NC}  Hermes API: ${CYAN}已启动（网关模式，无前端）${NC}"
     else
         err "OPC 后端启动失败。"
         exit 1

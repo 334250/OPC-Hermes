@@ -3,10 +3,11 @@
 # OPC-Hermes 启动脚本
 # ─────────────────────────────────────────────────────────────────────
 # 用法:
-#   ./scripts/start-opc.sh              # 启动 OPC WebUI + Hermes 网关（无前端）
-#   ./scripts/start-opc.sh --seed       # 初始化数据 + 启动全部
-#   ./scripts/start-opc.sh --full       # 初始化 + 全部 + 前端开发服务器
-#   ./scripts/start-opc.sh --no-hermes  # 仅启动 OPC WebUI（不启动 Hermes）
+#   ./scripts/start-opc.sh              # 启动 OPC WebUI + 内嵌 Hermes 原生 API
+#   ./scripts/start-opc.sh --seed       # 初始化数据 + 启动 WebUI
+#   ./scripts/start-opc.sh --full       # 初始化 + WebUI + Gateway + 前端开发服务器
+#   ./scripts/start-opc.sh --gateway    # 额外启动 Hermes Gateway（消息平台/Cron）
+#   ./scripts/start-opc.sh --no-hermes  # 兼容旧参数：不启动 Gateway
 #   ./scripts/start-opc.sh --help       # 查看帮助
 # ─────────────────────────────────────────────────────────────────────
 
@@ -16,11 +17,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OPC_PORT="${OPC_WEBUI_PORT:-8765}"
 OPC_HOST="${OPC_WEBUI_HOST:-127.0.0.1}"
-# Hermes uses gateway mode (headless API, no frontend)
 VENV_PYTHON=""
 BACKEND_PID=""
 HERMES_PID=""
 FRONTEND_PID=""
+CLEANED_UP=false
 
 # ── 颜色 ────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -42,6 +43,9 @@ info() { echo -e "${BLUE}[i]${NC} $*"; }
 
 # ── 清理 ────────────────────────────────────────────────────────────
 cleanup() {
+    $CLEANED_UP && return
+    CLEANED_UP=true
+    trap - INT TERM EXIT
     echo ""
     log "正在停止所有服务..."
     for pid in $BACKEND_PID $HERMES_PID $FRONTEND_PID; do
@@ -60,9 +64,10 @@ usage() {
     echo "用法: $0 [选项]"
     echo ""
     echo "选项:"
-    echo "  --seed          首次运行：初始化默认数据 + 启动全部"
-    echo "  --full          完整启动：初始化 + OPC + Hermes + 前端"
-    echo "  --no-hermes     仅启动 OPC WebUI（不启动 Hermes 后端）"
+    echo "  --seed          首次运行：初始化默认数据 + 启动 WebUI"
+    echo "  --full          完整启动：初始化 + OPC + Hermes Gateway + 前端"
+    echo "  --gateway       启动 Hermes Gateway（消息平台/Cron；默认不启动）"
+    echo "  --no-hermes     兼容旧参数：不启动 Hermes Gateway"
     echo "  --frontend-only 仅启动前端开发服务器"
     echo "  --port <port>   指定 OPC 后端端口（默认: 8765）"
     echo "  --help          显示此帮助"
@@ -122,13 +127,39 @@ seed_data() {
     log "默认数据初始化完成"
 }
 
+api_server_disabled() {
+    case "${API_SERVER_ENABLED:-}" in
+        false|FALSE|0|no|NO|off|OFF) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+configure_gateway_api_env() {
+    api_server_disabled && return
+
+    export API_SERVER_ENABLED="${API_SERVER_ENABLED:-true}"
+    export API_SERVER_HOST="${API_SERVER_HOST:-127.0.0.1}"
+    export API_SERVER_PORT="${API_SERVER_PORT:-8642}"
+
+    if [ -z "${API_SERVER_KEY:-}" ]; then
+        if [ -n "${OPC_HERMES_API_KEY:-}" ]; then
+            API_SERVER_KEY="$OPC_HERMES_API_KEY"
+        else
+            API_SERVER_KEY="$("$VENV_PYTHON" -c 'import secrets; print(secrets.token_hex(32))')"
+        fi
+        export API_SERVER_KEY
+    fi
+
+    export OPC_HERMES_API_KEY="${OPC_HERMES_API_KEY:-$API_SERVER_KEY}"
+    export OPC_HERMES_API_SERVER_URL="${OPC_HERMES_API_SERVER_URL:-http://127.0.0.1:${API_SERVER_PORT}/v1/chat/completions}"
+}
+
 # ── 启动 Hermes Agent ───────────────────────────────────────────────
 start_hermes() {
     local hermes_bin=""
     for candidate in \
-        "$PROJECT_ROOT/hermes-agent/.venv/bin/hermes" \
-        "$PROJECT_ROOT/hermes-agent/hermes" \
         "$PROJECT_ROOT/.venv/bin/hermes" \
+        "$PROJECT_ROOT/hermes-agent/.venv/bin/hermes" \
         ; do
         if [ -x "$candidate" ]; then hermes_bin="$candidate"; break; fi
     done
@@ -139,21 +170,22 @@ start_hermes() {
         return
     fi
 
-    info "启动 Hermes Agent 后端服务 (API Server)..."
-    # Use gateway mode for headless API (no dashboard frontend)
+    configure_gateway_api_env
+
+    info "启动 Hermes Agent Gateway（消息平台/Cron/API）..."
     "$hermes_bin" gateway &
     HERMES_PID=$!
     sleep 3
 
     if kill -0 "$HERMES_PID" 2>/dev/null; then
-        log "Hermes Agent 已启动 (PID: $HERMES_PID)"
-        echo -e "  ${GREEN}▸${NC}  Hermes API: ${CYAN}运行中${NC}（无前端）"
+        log "Hermes Gateway 已启动 (PID: $HERMES_PID)"
+        echo -e "  ${GREEN}▸${NC}  Hermes Gateway: ${CYAN}运行中${NC}"
+        if ! api_server_disabled; then
+            echo -e "  ${GREEN}▸${NC}  Hermes API:     ${CYAN}http://127.0.0.1:${API_SERVER_PORT}${NC}"
+        fi
     else
-        warn "Hermes Agent 启动失败，尝试 dashboard 模式..."
-        "$hermes_bin" dashboard --host "$HERMES_HOST" --port "$HERMES_PORT" --insecure &
-        HERMES_PID=$!
-        sleep 3
-        kill -0 "$HERMES_PID" 2>/dev/null && log "Hermes Dashboard 已启动 (http://$HERMES_HOST:$HERMES_PORT)" || HERMES_PID=""
+        warn "Hermes Gateway 启动失败；OPC WebUI 将继续启动，Hermes 原生 API 会以内嵌模式提供。"
+        HERMES_PID=""
     fi
 }
 
@@ -174,7 +206,10 @@ main(host='$OPC_HOST', port=$OPC_PORT)
         echo -e "  ${GREEN}▸${NC}  WebUI:     ${CYAN}http://$OPC_HOST:$OPC_PORT${NC}"
         echo -e "  ${GREEN}▸${NC}  API:       ${CYAN}http://$OPC_HOST:$OPC_PORT/api/health${NC}"
         echo -e "  ${GREEN}▸${NC}  API 文档:  ${CYAN}http://$OPC_HOST:$OPC_PORT/docs${NC}"
-        [ -n "$HERMES_PID" ] && echo -e "  ${GREEN}▸${NC}  Hermes API: ${CYAN}已启动（网关模式，无前端）${NC}"
+        echo -e "  ${GREEN}▸${NC}  Hermes API: ${CYAN}内嵌可用${NC}"
+        [ -n "$HERMES_PID" ] && echo -e "  ${GREEN}▸${NC}  Gateway:   ${CYAN}已启动（消息平台/Cron）${NC}"
+        [ -n "$HERMES_PID" ] && ! api_server_disabled && echo -e "  ${GREEN}▸${NC}  Chat API:  ${CYAN}http://127.0.0.1:${API_SERVER_PORT}/v1${NC}"
+        return 0
     else
         err "OPC 后端启动失败。"
         exit 1
@@ -195,15 +230,24 @@ start_frontend() {
         || warn "前端启动失败，请手动启动: cd $dir && npm run dev"
 }
 
+wait_for_services() {
+    local primary_pid="${BACKEND_PID:-$FRONTEND_PID}"
+    if [ -z "${primary_pid:-}" ]; then
+        return
+    fi
+    wait "$primary_pid"
+}
+
 # ── 主流程 ──────────────────────────────────────────────────────────
 main() {
-    local seed=false full=false frontend_only=false no_hermes=false
+    local seed=false full=false frontend_only=false start_gateway=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --seed)          seed=true; shift ;;
-            --full)          full=true; shift ;;
-            --no-hermes)     no_hermes=true; shift ;;
+            --full)          full=true; start_gateway=true; shift ;;
+            --gateway|--with-gateway) start_gateway=true; shift ;;
+            --no-hermes)     start_gateway=false; shift ;;
             --frontend-only) frontend_only=true; shift ;;
             --port)          OPC_PORT="$2"; shift 2 ;;
             --help|-h)       usage ;;
@@ -217,14 +261,14 @@ main() {
     if $frontend_only; then
         start_frontend
         info "按 Ctrl+C 停止。"
-        wait
+        wait_for_services
         exit 0
     fi
 
     check_deps
     $seed || $full && seed_data
     $full || ensure_frontend_build
-    $no_hermes || start_hermes
+    $start_gateway && start_hermes
     start_backend
     $full && start_frontend
 
@@ -232,7 +276,7 @@ main() {
     info "所有服务已启动，按 Ctrl+C 停止。"
     echo ""
 
-    wait
+    wait_for_services
 }
 
 main "$@"

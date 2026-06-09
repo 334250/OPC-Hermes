@@ -1,5 +1,4 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import AgentList from './pages/AgentList'
 import AgentDetail from './pages/AgentDetail'
 import TaskList from './pages/TaskList'
@@ -9,6 +8,7 @@ import ArtifactViewer from './pages/ArtifactViewer'
 import Proposals from './pages/Proposals'
 import Config from './pages/Config'
 import HermesChat from './pages/HermesChat'
+import AnalyticsPage from './pages/Analytics'
 import HermesPanel from './pages/HermesPanel'
 import {
   HermesConfigPage,
@@ -17,25 +17,21 @@ import {
   HermesLogsPage,
   HermesModelsPage,
   HermesPluginsPage,
+  // HermesProfilesPage,  // disabled — Hermes Profiles not used in OPC-Hermes business layer
   HermesSessionsPage,
   HermesSkillsPage,
 } from './pages/NativeHermes'
 import { useI18n } from './lib/i18n'
 
 const navItems = [
-  { to: '/', labelKey: 'opcDashboard', icon: '◈' },
   { to: '/chat', labelKey: 'chat', icon: '▣' },
   { to: '/sessions', labelKey: 'sessions', icon: '◫' },
   { to: '/analytics', labelKey: 'analytics', icon: '▥' },
   { to: '/models', labelKey: 'models', icon: '◉' },
-  { to: '/logs', labelKey: 'logs', icon: '▤' },
   { to: '/cron', labelKey: 'cron', icon: '◷' },
   { to: '/skills', labelKey: 'skills', icon: '▧' },
   { to: '/plugins', labelKey: 'plugins', icon: '✣' },
   { to: '/profiles', labelKey: 'profiles', icon: '♙' },
-  { to: '/config', labelKey: 'config', icon: '⚙' },
-  { to: '/env', labelKey: 'keys', icon: '⚿' },
-  { to: '/documentation', labelKey: 'documentation', icon: '▨' },
   { to: '/tasks', labelKey: 'taskList', icon: '▦' },
   { to: '/tasks/new', labelKey: 'createTask', icon: '+' },
   { to: '/agents', labelKey: 'agentManager', icon: '⎔' },
@@ -114,16 +110,16 @@ export default function App() {
         </header>
         <div className="p-6 max-w-7xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Navigate to="/chat" replace />} />
             <Route path="/chat" element={<HermesChat />} />
             <Route path="/sessions" element={<HermesSessionsPage />} />
-            <Route path="/analytics" element={<HermesPanel />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/models" element={<HermesModelsPage />} />
             <Route path="/logs" element={<HermesLogsPage />} />
             <Route path="/cron" element={<HermesCronPage />} />
             <Route path="/skills" element={<HermesSkillsPage />} />
             <Route path="/plugins" element={<HermesPluginsPage />} />
-            <Route path="/profiles" element={<HermesPanel />} />
+            {/* <Route path="/profiles" element={<HermesProfilesPage />} /> */}
             <Route path="/config" element={<HermesConfigPage />} />
             <Route path="/env" element={<HermesKeysPage />} />
             <Route path="/documentation" element={<HermesPanel />} />

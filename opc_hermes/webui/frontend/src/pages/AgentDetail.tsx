@@ -1,24 +1,63 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, type ModelDef } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 
 export default function AgentDetail() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { agentId } = useParams<{ agentId: string }>()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [models, setModels] = useState<ModelDef[]>([])
+  const [selectedModelId, setSelectedModelId] = useState('')
+  const [selectedTier, setSelectedTier] = useState('standard')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
 
   useEffect(() => {
     if (!agentId) return
     setLoading(true)
-    api.getAgent(agentId).then(setData).finally(() => setLoading(false))
+    Promise.all([
+      api.getAgent(agentId),
+      api.listModels(),
+    ]).then(([agentData, modelsRes]) => {
+      setData(agentData)
+      // Only show configured models (those with api_base set)
+      const configured = (modelsRes.models ?? []).filter(m => m.api_base && m.api_base.trim())
+      setModels(configured)
+      // Pre-select current agent model
+      const agent = agentData.agent
+      setSelectedModelId(agent.default_model || '')
+      setSelectedTier(agent.model_tier || 'standard')
+    }).finally(() => setLoading(false))
   }, [agentId])
+
+  const handleSaveModel = async () => {
+    if (!selectedModelId || !agentId) return
+    const model = models.find(m => m.id === selectedModelId)
+    if (!model) return
+    setSaving(true)
+    setMsg('')
+    try {
+      const result = await api.updateAgentModel(agentId, {
+        provider: model.provider,
+        model: model.id,
+        model_tier: selectedTier,
+      })
+      setData((prev: any) => ({ ...prev, agent: result.agent }))
+      setMsg(t('modelSaved'))
+    } catch (e: any) {
+      setMsg(`${t('failedToLoad')}: ${e.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (loading) return <div className="card animate-pulse"><div className="h-64 bg-opc-surface-2 rounded" /></div>
   if (!data) return <div className="text-opc-text-2">{t('agentNotFound')}</div>
 
   const agent = data.agent
+  const currentModel = models.find(m => m.id === (agent.default_model || selectedModelId))
 
   return (
     <div>
@@ -43,6 +82,53 @@ export default function AgentDetail() {
         <StatBox label={t('success')} value={agent.success_rate ? `${(agent.success_rate * 100).toFixed(0)}%` : '—'} />
         <StatBox label={t('model')} value={agent.default_model || 'default'} />
         <StatBox label={t('skills')} value={agent.skill_ids?.length ?? 0} />
+      </div>
+
+      {/* Model Selector */}
+      <div className="card mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-opc-text-2 uppercase tracking-wider">{t('modelSettings')}</h3>
+          {msg && (
+            <span className={`text-xs ${msg.includes('失败') || msg.includes('failed') ? 'text-red-400' : 'text-green-400'}`}>{msg}</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-xs text-opc-text-2">{t('selectModel')}</span>
+            <select className="input" value={selectedModelId} onChange={e => setSelectedModelId(e.target.value)}>
+              <option value="">-- {t('defaultAutoFallback')} --</option>
+              {models.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name || m.id} ({m.provider})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-opc-text-2">{t('tier')}</span>
+            <select className="input" value={selectedTier} onChange={e => setSelectedTier(e.target.value)}>
+              <option value="budget">{t('tierBudget')}</option>
+              <option value="standard">{t('tierStandard')}</option>
+              <option value="premium">{t('tierPremium')}</option>
+            </select>
+          </label>
+          <label className="block flex items-end">
+            <button className="btn-primary text-xs w-full" disabled={!selectedModelId || saving} onClick={handleSaveModel}>
+              {saving ? (lang === 'zh' ? '保存中...' : 'Saving...') : t('saveModel')}
+            </button>
+          </label>
+        </div>
+        {currentModel && (
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-opc-text-2">
+            <span>{t('currentModel')}: {currentModel.display_name || currentModel.id}</span>
+            <span className="text-opc-text-2">·</span>
+            <span>{currentModel.provider}</span>
+            <span className="text-opc-text-2">·</span>
+            <span>{Math.round(currentModel.context_length / 1000)}K ctx</span>
+            {currentModel.capabilities?.vision && <span>· 👁 Vision</span>}
+            {currentModel.capabilities?.tool_calling && <span>· 🔧 Tools</span>}
+          </div>
+        )}
       </div>
 
       {/* Skills */}

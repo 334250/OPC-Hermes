@@ -1,220 +1,320 @@
-import { FitAddon } from '@xterm/addon-fit'
-import { Terminal } from '@xterm/xterm'
-import '@xterm/xterm/css/xterm.css'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { api, type HermesChatConfigResponse } from '../lib/api'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, type ModelDef } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 
-type ConnectionState = 'idle' | 'connecting' | 'connected' | 'closed' | 'error'
-
-function channelId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
-  return `opc-chat-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  images?: string[]
 }
 
-function wsUrl(config: HermesChatConfigResponse, resume: string | null, channel: string) {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const qs = new URLSearchParams({ token: config.token, channel })
-  if (resume) qs.set('resume', resume)
-  return `${proto}//${window.location.host}${config.pty_path}?${qs.toString()}`
+function imageSrcFromBase64(value: string) {
+  return value.startsWith('data:') ? value : `data:image/png;base64,${value}`
 }
 
-const terminalTheme = {
-  background: '#071516',
-  foreground: '#e7edf0',
-  cursor: '#67e8f9',
-  cursorAccent: '#071516',
-  selectionBackground: '#3b82f655',
-  black: '#0f172a',
-  red: '#f87171',
-  green: '#34d399',
-  yellow: '#facc15',
-  blue: '#60a5fa',
-  magenta: '#c084fc',
-  cyan: '#22d3ee',
-  white: '#e5e7eb',
+function normalizeAssistantContent(value: unknown): { text: string; images: string[] } {
+  const images: string[] = []
+
+  const walk = (item: unknown): string => {
+    if (item == null) return ''
+    if (typeof item === 'string') return item
+    if (Array.isArray(item)) {
+      return item.map(walk).filter(Boolean).join('\n')
+    }
+    if (typeof item !== 'object') return String(item)
+
+    const obj = item as Record<string, any>
+    if (typeof obj.b64_json === 'string') {
+      images.push(imageSrcFromBase64(obj.b64_json))
+      return ''
+    }
+    if (typeof obj.base64 === 'string') {
+      images.push(imageSrcFromBase64(obj.base64))
+      return ''
+    }
+    if (typeof obj.url === 'string') {
+      images.push(obj.url)
+      return ''
+    }
+    if (obj.image_url) {
+      if (typeof obj.image_url === 'string') {
+        images.push(obj.image_url)
+      } else if (typeof obj.image_url?.url === 'string') {
+        images.push(obj.image_url.url)
+      }
+      return ''
+    }
+    if (typeof obj.text === 'string') return obj.text
+    if (typeof obj.content === 'string' || Array.isArray(obj.content)) return walk(obj.content)
+    return ''
+  }
+
+  return { text: walk(value).trim(), images }
+}
+
+function extractAssistantMessage(data: any): { content: string; images: string[] } {
+  const firstChoice = data?.choices?.[0]
+  const message = firstChoice?.message ?? firstChoice?.delta ?? data?.message
+  const fromMessage = normalizeAssistantContent(message?.content)
+  const fromOutput = normalizeAssistantContent(data?.output ?? data?.data)
+  const directText = typeof data?.output_text === 'string' ? data.output_text : typeof data?.text === 'string' ? data.text : ''
+  const content = [fromMessage.text, directText, fromOutput.text].filter(Boolean).join('\n\n').trim()
+  return {
+    content,
+    images: [...fromMessage.images, ...fromOutput.images],
+  }
 }
 
 export default function HermesChat() {
-  const { lang } = useI18n()
-  const [searchParams] = useSearchParams()
-  const resume = searchParams.get('resume')
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  const terminalRef = useRef<Terminal | null>(null)
-  const fitRef = useRef<FitAddon | null>(null)
-  const wsRef = useRef<WebSocket | null>(null)
-  const [config, setConfig] = useState<HermesChatConfigResponse | null>(null)
-  const [state, setState] = useState<ConnectionState>('idle')
+  const { t, lang } = useI18n()
+  const [models, setModels] = useState<ModelDef[]>([])
+  const [selectedModel, setSelectedModel] = useState('')
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [streaming, setStreaming] = useState(false)
+  const [streamContent, setStreamContent] = useState('')
   const [error, setError] = useState('')
-  const [instance, setInstance] = useState(0)
-  const channel = useMemo(() => channelId(), [instance, resume])
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  const fit = useCallback(() => {
-    const fitAddon = fitRef.current
-    const terminal = terminalRef.current
-    const ws = wsRef.current
-    if (!fitAddon || !terminal) return
-    try {
-      fitAddon.fit()
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(`\x1b[RESIZE:${terminal.cols};${terminal.rows}]`)
+  // Load configured models
+  useEffect(() => {
+    api.listModels().then(res => {
+      const configured = (res.models ?? []).filter(m => m.api_base && m.api_base.trim())
+      setModels(configured)
+      if (configured.length > 0 && !selectedModel) {
+        setSelectedModel(configured[0].id)
       }
-    } catch {
-      /* Layout may not be ready yet. */
-    }
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, streamContent])
+
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus()
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    api.hermesChatConfig()
-      .then((next) => {
-        if (cancelled) return
-        setConfig(next)
-      })
-      .catch((e) => {
-        if (cancelled) return
-        setError(e.message)
-        setState('error')
-      })
-    return () => { cancelled = true }
-  }, [])
+  const handleSend = useCallback(async () => {
+    const text = input.trim()
+    if (!text || streaming || !selectedModel) return
+    const selectedModelDef = models.find(m => m.id === selectedModel)
+    const useStream = !selectedModelDef?.capabilities?.image_gen
 
-  useEffect(() => {
-    if (!config || !hostRef.current) return
-    if (!config.enabled || !config.token) {
-      setError(lang === 'zh' ? 'Hermes Chat 未启用或缺少 WS token。' : 'Hermes Chat is not enabled or the WS token is missing.')
-      setState('error')
-      return
-    }
-
-    setState('connecting')
+    const userMsg: ChatMessage = { role: 'user', content: text }
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
+    setInput('')
+    setStreaming(true)
+    setStreamContent('')
     setError('')
-    hostRef.current.innerHTML = ''
 
-    const terminal = new Terminal({
-      cursorBlink: true,
-      convertEol: false,
-      fontFamily: 'JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-      fontSize: 13,
-      lineHeight: 1.12,
-      scrollback: 8000,
-      theme: terminalTheme,
-      allowProposedApi: false,
-    })
-    const fitAddon = new FitAddon()
-    terminal.loadAddon(fitAddon)
-    terminal.open(hostRef.current)
-    terminal.focus()
-    terminal.writeln('\x1b[90mConnecting to Hermes PTY...\x1b[0m')
+    const controller = new AbortController()
+    abortRef.current = controller
 
-    terminalRef.current = terminal
-    fitRef.current = fitAddon
+    try {
+      const payload = {
+        model: selectedModel,
+        messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
+        stream: useStream,
+      }
 
-    let raf1 = requestAnimationFrame(() => {
-      raf1 = 0
-      fit()
-    })
+      const res = await fetch('/api/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
 
-    const socket = new WebSocket(wsUrl(config, resume, channel))
-    socket.binaryType = 'arraybuffer'
-    wsRef.current = socket
+      if (!res.ok) {
+        const errBody = await res.text()
+        let errMsg = `HTTP ${res.status}`
+        try {
+          const errJson = JSON.parse(errBody)
+          errMsg = errJson.error?.message || errJson.detail || errMsg
+        } catch {}
+        throw new Error(errMsg)
+      }
 
-    socket.onopen = () => {
-      setState('connected')
-      fit()
-    }
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.toLowerCase().startsWith('text/event-stream')) {
+        const reader = res.body?.getReader()
+        if (!reader) throw new Error('No response body')
 
-    socket.onmessage = (event) => {
-      if (typeof event.data === 'string') {
-        terminal.write(event.data)
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let fullContent = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed || !trimmed.startsWith('data:')) continue
+            const data = trimmed.slice(5).trim()
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+              const delta = parsed.choices?.[0]?.delta?.content
+              const normalized = normalizeAssistantContent(delta)
+              if (normalized.text) {
+                fullContent += normalized.text
+                setStreamContent(fullContent)
+              }
+            } catch {
+              // skip unparseable chunks
+            }
+          }
+        }
+
+        setMessages(prev => [...prev, { role: 'assistant', content: fullContent || '(empty response)' }])
       } else {
-        terminal.write(new Uint8Array(event.data as ArrayBuffer))
+        const data = await res.json()
+        const parsed = extractAssistantMessage(data)
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: parsed.content || (parsed.images.length ? '' : '(empty response)'),
+          images: parsed.images,
+        }])
       }
+    } catch (e: any) {
+      if (e.name === 'AbortError') return
+      setError(e.message || 'Request failed')
+    } finally {
+      setStreaming(false)
+      setStreamContent('')
+      abortRef.current = null
     }
+  }, [input, streaming, selectedModel, messages, models])
 
-    socket.onerror = () => {
-      setState('error')
-      setError(lang === 'zh' ? 'WebSocket 连接失败。' : 'WebSocket connection failed.')
+  const handleStop = () => {
+    abortRef.current?.abort()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
     }
+  }
 
-    socket.onclose = (event) => {
-      wsRef.current = null
-      if (event.code === 4401) {
-        setState('error')
-        setError(lang === 'zh' ? 'Chat WebSocket 认证失败。' : 'Chat WebSocket auth failed.')
-        return
-      }
-      if (event.code === 4403) {
-        setState('error')
-        setError(lang === 'zh' ? 'Chat 只允许本机访问。' : 'Chat is only available from localhost.')
-        return
-      }
-      if (event.code !== 1000 && event.code !== 1005 && event.code !== 1011) {
-        setState('error')
-        setError(`WebSocket closed: ${event.code}`)
-        return
-      }
-      setState('closed')
-      terminal.writeln('\r\n\x1b[90m[session ended]\x1b[0m')
-    }
-
-    // eslint-disable-next-line no-control-regex
-    const sgrMouse = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/
-    const inputDisposable = terminal.onData((data) => {
-      if (sgrMouse.test(data)) return
-      if (socket.readyState === WebSocket.OPEN) socket.send(data)
-    })
-    const resizeDisposable = terminal.onResize(({ cols, rows }) => {
-      if (socket.readyState === WebSocket.OPEN) socket.send(`\x1b[RESIZE:${cols};${rows}]`)
-    })
-
-    const resizeObserver = new ResizeObserver(() => fit())
-    resizeObserver.observe(hostRef.current)
-    window.addEventListener('resize', fit)
-
-    return () => {
-      if (raf1) cancelAnimationFrame(raf1)
-      inputDisposable.dispose()
-      resizeDisposable.dispose()
-      resizeObserver.disconnect()
-      window.removeEventListener('resize', fit)
-      socket.close()
-      terminal.dispose()
-      if (wsRef.current === socket) wsRef.current = null
-      if (terminalRef.current === terminal) terminalRef.current = null
-      if (fitRef.current === fitAddon) fitRef.current = null
-    }
-  }, [channel, config, fit, lang, resume])
-
-  const reconnect = () => setInstance((value) => value + 1)
+  const currentModelName = models.find(m => m.id === selectedModel)?.display_name || selectedModel
 
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] flex-col">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">{lang === 'zh' ? 'Hermes Chat' : 'Hermes Chat'}</h2>
-          <p className="mt-1 max-w-3xl text-sm text-opc-text-2">
-            {resume
-              ? (lang === 'zh' ? `恢复会话：${resume}` : `Resuming session: ${resume}`)
-              : (lang === 'zh' ? '原生 Hermes TUI，经 PTY/WebSocket 嵌入 OPC-Hermes。' : 'Native Hermes TUI embedded through PTY/WebSocket.')}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={state === 'connected' ? 'badge-success' : state === 'error' ? 'badge-error' : 'badge-info'}>{state}</span>
-          <button className="btn-secondary text-xs" onClick={reconnect}>{lang === 'zh' ? '重连' : 'Reconnect'}</button>
-          <Link className="btn-secondary text-xs" to="/sessions">{lang === 'zh' ? '会话列表' : 'Sessions'}</Link>
-        </div>
+    <div className="flex h-[calc(100vh-7rem)] flex-col">
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-3">
+        <h2 className="text-xl font-semibold shrink-0">{lang === 'zh' ? 'Chat' : 'Chat'}</h2>
+        <select
+          className="input w-56 text-xs"
+          value={selectedModel}
+          onChange={e => setSelectedModel(e.target.value)}
+        >
+          {models.length === 0 && <option value="">{lang === 'zh' ? '暂无已配置模型' : 'No models configured'}</option>}
+          {models.map(m => (
+            <option key={m.id} value={m.id}>{m.display_name || m.id}</option>
+          ))}
+        </select>
+        {streaming && (
+          <button className="btn-secondary text-xs" onClick={handleStop}>
+            {lang === 'zh' ? '停止' : 'Stop'}
+          </button>
+        )}
+        {error && <span className="text-xs text-red-400 truncate">{error}</span>}
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-400">
-          {error}
-        </div>
-      )}
+      {/* Messages */}
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-opc-border bg-opc-surface p-4">
+        {messages.length === 0 && !streaming ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <div className="text-4xl mb-4 opacity-30">💬</div>
+              <p className="text-sm text-opc-text-2">
+                {lang === 'zh'
+                  ? `向 ${currentModelName || 'AI'} 发送消息开始对话`
+                  : `Send a message to ${currentModelName || 'AI'} to start`}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-opc-accent text-white'
+                      : 'bg-opc-surface-2 text-opc-text'
+                  }`}
+                >
+                  {msg.content && <div className="whitespace-pre-wrap break-words">{msg.content}</div>}
+                  {msg.images?.length ? (
+                    <div className="mt-3 grid grid-cols-1 gap-2">
+                      {msg.images.map((src, imageIndex) => (
+                        <a key={`${src}-${imageIndex}`} href={src} target="_blank" rel="noreferrer">
+                          <img className="max-h-[420px] rounded-lg border border-opc-border object-contain" src={src} alt={lang === 'zh' ? '生成图片' : 'Generated image'} />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
 
-      <div className="min-h-0 flex-1 rounded-lg border border-opc-border bg-[#071516] p-2 shadow-inner">
-        <div ref={hostRef} className="h-[calc(100vh-13rem)] min-h-[520px] overflow-hidden rounded bg-[#071516]" />
+            {/* Streaming bubble */}
+            {streaming && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-xl bg-opc-surface-2 px-4 py-3 text-sm leading-relaxed text-opc-text">
+                  <div className="whitespace-pre-wrap break-words">
+                    {streamContent || (
+                      <span className="inline-flex items-center gap-1 text-opc-text-2">
+                        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-opc-accent" />
+                        {lang === 'zh' ? '思考中...' : 'Thinking...'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="mt-3 flex gap-2">
+        <input
+          ref={inputRef}
+          className="input flex-1"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={lang === 'zh' ? '输入消息，Enter 发送...' : 'Type a message, Enter to send...'}
+          disabled={streaming || models.length === 0}
+        />
+        <button
+          className="btn-primary text-sm px-6"
+          onClick={handleSend}
+          disabled={!input.trim() || streaming || !selectedModel}
+        >
+          {streaming
+            ? '...'
+            : lang === 'zh' ? '发送' : 'Send'}
+        </button>
       </div>
     </div>
   )

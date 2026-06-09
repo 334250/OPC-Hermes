@@ -1,5 +1,9 @@
 const API_BASE = '/api'
 const HERMES_API_BASE = '/hermes-api/api'
+const HERMES_SESSION_HEADER = 'X-Hermes-Session-Token'
+
+let hermesSessionToken: string | null = null
+let hermesSessionTokenPromise: Promise<string> | null = null
 
 // ── TypeScript Interfaces ───────────────────────────────────────────────
 
@@ -29,6 +33,7 @@ export interface AgentSummary {
   role: 'leader' | 'worker' | 'evaluator'
   capabilities: string[]
   skill_ids: string[]
+  default_provider: string
   default_model: string
   model_tier: string
   toolsets: string[]
@@ -92,6 +97,32 @@ export interface TaskDetailResponse {
   steps: TaskStep[]
   dag: { nodes: DAGNode[]; edges: DAGEdge[] }
   artifacts: Record<string, any>
+}
+
+export interface PipelineStepDef {
+  index: number
+  worker_id: string
+  prompt_template: string
+  expected_output_format: string
+  timeout_seconds: number
+  model_override?: string | null
+  upstream: number[]
+  memory_mode: string
+}
+
+export interface PipelineTemplateDef {
+  id: string
+  name: string
+  description: string
+  mode: string
+  default_complexity: string
+  steps: PipelineStepDef[]
+}
+
+export interface ExecutePipelineResponse {
+  status: string
+  task_id: string
+  steps: any[]
 }
 
 export interface MemoryProtocol {
@@ -290,6 +321,25 @@ export interface HermesPluginInfo {
   source: string
 }
 
+export interface HermesProfileInfo {
+  name: string
+  path: string
+  is_default: boolean
+  model?: string | null
+  provider?: string | null
+  has_env: boolean
+  skill_count: number
+}
+
+export interface HermesProfilesResponse {
+  profiles: HermesProfileInfo[]
+}
+
+export interface HermesProfileSoulResponse {
+  content: string
+  exists: boolean
+}
+
 export interface HermesOAuthProvidersResponse {
   providers: Array<{
     id: string
@@ -316,6 +366,226 @@ export interface HermesChatConfigResponse {
   events_path: string
 }
 
+export interface HermesModelBindingProvider {
+  id: string
+  name: string
+  api_base: string
+  api_key_env: string
+  api_key_set: boolean
+  configured: boolean
+  default_model: string
+  local: boolean
+  models: Array<{
+    id: string
+    display_name: string
+    provider: string
+    tier: string
+    context_length: number
+    capabilities: Record<string, boolean>
+    suitable_complexity: string[]
+    api_base?: string | null
+    api_key_ref?: string | null
+    active?: boolean
+    description?: string
+  }>
+}
+
+export interface HermesModelBindingsResponse {
+  current: {
+    provider: string
+    model: string
+    base_url: string
+    context_length: number
+  }
+  providers: HermesModelBindingProvider[]
+  local_profiles: Array<{ id: string; name: string; api_base: string }>
+  source: string
+  refreshed: boolean
+  config_path: string
+  env_path: string
+}
+
+export interface HermesModelBindingRequest {
+  provider_id: string
+  provider_name?: string
+  api_base?: string
+  api_key?: string
+  api_key_env?: string
+  api_mode?: string
+  model_id?: string
+  display_name?: string
+  tier?: string
+  context_length?: number
+  capabilities?: Record<string, boolean>
+  suitable_complexity?: string[]
+  description?: string
+  save_as_main?: boolean
+}
+
+export interface HermesLocalModelDiscoveryResponse {
+  ok: boolean
+  endpoint?: string
+  models: string[]
+  message: string
+}
+
+export interface ModelDef {
+  id: string
+  display_name: string
+  provider: string
+  tier: string
+  context_length: number
+  capabilities: Record<string, boolean>
+  suitable_complexity: string[]
+  api_base?: string | null
+  api_key_ref?: string | null
+  active: boolean
+  description: string
+}
+
+export interface ModelProviderInfo {
+  id: string
+  name: string
+  api_base: string
+  api_key_ref: string
+}
+
+export interface AnalyticsUsageDaily {
+  day: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  reasoning_tokens: number
+  estimated_cost: number
+  actual_cost: number
+  sessions: number
+  api_calls: number
+}
+
+export interface AnalyticsUsageModel {
+  model: string
+  input_tokens: number
+  output_tokens: number
+  estimated_cost: number
+  sessions: number
+  api_calls: number
+}
+
+export interface AnalyticsUsage {
+  daily: AnalyticsUsageDaily[]
+  by_model: AnalyticsUsageModel[]
+  totals: {
+    total_input: number
+    total_output: number
+    total_cache_read: number
+    total_reasoning: number
+    total_estimated_cost: number
+    total_actual_cost: number
+    total_sessions: number
+    total_api_calls: number
+  }
+  period_days: number
+  skills: {
+    summary: Record<string, number>
+    top_skills: Array<Record<string, any>>
+  }
+  source: string
+}
+
+export interface AnalyticsModelUsage {
+  model: string
+  provider: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  reasoning_tokens: number
+  estimated_cost: number
+  actual_cost: number
+  sessions: number
+  api_calls: number
+  tool_calls: number
+  last_used_at: number | string | null
+  avg_tokens_per_session: number
+  capabilities: Record<string, any>
+}
+
+export interface AnalyticsModels {
+  models: AnalyticsModelUsage[]
+  totals: {
+    distinct_models: number
+    total_input: number
+    total_output: number
+    total_cache_read: number
+    total_reasoning: number
+    total_estimated_cost: number
+    total_actual_cost: number
+    total_sessions: number
+    total_api_calls: number
+  }
+  period_days: number
+  source: string
+}
+
+export interface AnalyticsOpc {
+  period_days: number
+  source: string
+  task_totals: Record<'total' | 'completed' | 'active' | 'partial' | 'pending' | 'failed' | 'blocked', number>
+  agent_totals: Record<'total' | 'leader' | 'worker' | 'evaluator', number>
+  evaluations_total: number
+  avg_quality: number | null
+  tool_calls: number
+  daily_activity: Array<{ day: string; tasks_created: number; reports: number; evaluations: number; tool_calls: number }>
+  score_dimensions: Array<{ key: string; avg: number; count: number }>
+  quality_trend: Array<{ date: string; worker_id: string; score: number }>
+  recent_tasks: Array<{
+    task_id: string
+    status: string
+    workers: string[]
+    total_steps: number
+    completed_steps: number
+    tool_calls: number
+    evaluations: number
+    last_activity: string
+  }>
+  worker_activity: Array<{
+    worker_id: string
+    display_name: string
+    role: string
+    model: string
+    provider: string
+    tasks: number
+    reports: number
+    completed_reports: number
+    failed_reports: number
+    active_reports: number
+    tool_calls: number
+    avg_quality: number | null
+    last_activity: string
+  }>
+  model_assignments: Array<{
+    model: string
+    provider: string
+    agents: number
+    workers: number
+    tasks: number
+    tool_calls: number
+  }>
+}
+
+export interface AnalyticsResponse {
+  period_days: number
+  generated_at: string
+  sources: {
+    usage: string
+    models: string
+    opc: string
+    warnings: string[]
+  }
+  usage: AnalyticsUsage
+  models: AnalyticsModels
+  opc: AnalyticsOpc
+}
+
 // ── API Client ───────────────────────────────────────────────────────────
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -330,11 +600,45 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-async function hermesRequest<T>(path: string, options?: RequestInit): Promise<T> {
+async function getHermesSessionToken(): Promise<string> {
+  if (hermesSessionToken) return hermesSessionToken
+  if (!hermesSessionTokenPromise) {
+    hermesSessionTokenPromise = fetch(`${API_BASE}/hermes/chat-config`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(err.detail || err.message || `HTTP ${res.status}`)
+        }
+        return res.json() as Promise<HermesChatConfigResponse>
+      })
+      .then((config) => {
+        hermesSessionToken = config.token || ''
+        return hermesSessionToken
+      })
+      .finally(() => {
+        hermesSessionTokenPromise = null
+      })
+  }
+  return hermesSessionTokenPromise
+}
+
+async function hermesRequest<T>(path: string, options?: RequestInit, retryOnUnauthorized = true): Promise<T> {
+  const token = await getHermesSessionToken()
+  const headers = new Headers(options?.headers)
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (token && !headers.has(HERMES_SESSION_HEADER)) {
+    headers.set(HERMES_SESSION_HEADER, token)
+  }
   const res = await fetch(`${HERMES_API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers,
   })
+  if (res.status === 401 && retryOnUnauthorized) {
+    hermesSessionToken = null
+    return hermesRequest<T>(path, options, false)
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || err.message || `HTTP ${res.status}`)
@@ -344,14 +648,26 @@ async function hermesRequest<T>(path: string, options?: RequestInit): Promise<T>
 
 export const api = {
   dashboard: () => request<DashboardResponse>('/dashboard'),
+  analytics: (days = 30) => request<AnalyticsResponse>(`/analytics?days=${days}`),
 
   listAgents: (role?: string) => request<AgentsResponse>(`/agents${role ? `?role=${role}` : ''}`),
   getAgent: (id: string) => request<AgentDetailResponse>(`/agents/${id}`),
+  updateAgentModel: (id: string, body: { provider: string; model: string; model_tier: string }) =>
+    request<{ ok: boolean; agent: AgentSummary }>(`/agents/${encodeURIComponent(id)}/model`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   getAgentEvaluations: (id: string, limit = 50) =>
     request<{ agent_id: string; evaluations: EvaluationEntry[] }>(`/agents/${id}/evaluations?limit=${limit}`),
 
   getTask: (taskId: string) => request<TaskDetailResponse>(`/tasks/${taskId}`),
   listTasks: () => request<TasksResponse>('/tasks'),
+  listPipelines: () => request<{ templates: PipelineTemplateDef[] }>('/pipelines'),
+  executePipeline: (pipelineId: string, userRequest: string) =>
+    request<ExecutePipelineResponse>(`/pipelines/${encodeURIComponent(pipelineId)}/execute`, {
+      method: 'POST',
+      body: JSON.stringify({ user_request: userRequest }),
+    }),
 
   browseMemory: <T = ProjectMemoryData | EvalMemoryData>(partition: string, taskId?: string, workerId?: string) =>
     request<T>(`/memory/${partition}${taskId ? `?task_id=${taskId}` : ''}${workerId ? `&worker_id=${workerId}` : ''}`),
@@ -400,6 +716,15 @@ export const api = {
   hermesAuxiliaryModels: () => hermesRequest<HermesAuxiliaryModelsResponse>('/model/auxiliary'),
   hermesSetModel: (body: { scope: 'main' | 'auxiliary'; provider: string; model: string; task?: string }) =>
     hermesRequest<{ ok: boolean }>('/model/set', { method: 'POST', body: JSON.stringify(body) }),
+  hermesModelBindings: (refresh = false) =>
+    request<HermesModelBindingsResponse>(`/hermes/model-bindings${refresh ? '?refresh=true' : ''}`),
+  hermesSaveModelBinding: (body: HermesModelBindingRequest) =>
+    request<{ ok: boolean; provider: string; model: string; api_base: string; api_key_env: string; saved_main: boolean }>(
+      '/hermes/model-bindings',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  hermesDiscoverLocalModels: (body: { provider_id: string; api_base: string }) =>
+    request<HermesLocalModelDiscoveryResponse>('/hermes/local-models/discover', { method: 'POST', body: JSON.stringify(body) }),
   hermesConfig: () => hermesRequest<Record<string, any>>('/config'),
   hermesConfigDefaults: () => hermesRequest<Record<string, any>>('/config/defaults'),
   hermesConfigSchema: () => hermesRequest<{ fields: Record<string, any>; category_order: string[] }>('/config/schema'),
@@ -411,6 +736,22 @@ export const api = {
   hermesDeleteEnv: (key: string) =>
     hermesRequest<{ ok: boolean; key: string }>('/env', { method: 'DELETE', body: JSON.stringify({ key }) }),
   hermesOAuthProviders: () => hermesRequest<HermesOAuthProvidersResponse>('/providers/oauth'),
+  hermesProfiles: () => hermesRequest<HermesProfilesResponse>('/profiles'),
+  hermesCreateProfile: (body: { name: string; clone_from_default?: boolean; no_skills?: boolean }) =>
+    hermesRequest<{ ok: boolean; name: string; path: string }>('/profiles', { method: 'POST', body: JSON.stringify(body) }),
+  hermesRenameProfile: (name: string, newName: string) =>
+    hermesRequest<{ ok: boolean; name: string; path: string }>(`/profiles/${encodeURIComponent(name)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ new_name: newName }),
+    }),
+  hermesDeleteProfile: (name: string) =>
+    hermesRequest<{ ok: boolean; path: string }>(`/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  hermesProfileSetupCommand: (name: string) =>
+    hermesRequest<{ command: string }>(`/profiles/${encodeURIComponent(name)}/setup-command`),
+  hermesProfileSoul: (name: string) =>
+    hermesRequest<HermesProfileSoulResponse>(`/profiles/${encodeURIComponent(name)}/soul`),
+  hermesSaveProfileSoul: (name: string, content: string) =>
+    hermesRequest<{ ok: boolean }>(`/profiles/${encodeURIComponent(name)}/soul`, { method: 'PUT', body: JSON.stringify({ content }) }),
   hermesCronJobs: (profile = 'all') =>
     hermesRequest<HermesCronJob[]>(`/cron/jobs?profile=${encodeURIComponent(profile)}`),
   hermesCreateCronJob: (job: { prompt: string; schedule: string; name?: string; deliver?: string }, profile = 'default') =>
@@ -434,6 +775,22 @@ export const api = {
       `/dashboard/plugins/${name.split('/').map(encodeURIComponent).join('/')}/visibility`,
       { method: 'POST', body: JSON.stringify({ hidden }) },
     ),
+
+  listModels: (tier?: string, provider?: string) => {
+    const qs = new URLSearchParams()
+    if (tier) qs.set('tier', tier)
+    if (provider) qs.set('provider', provider)
+    const q = qs.toString()
+    return request<{ models: ModelDef[] }>(`/models${q ? `?${q}` : ''}`)
+  },
+  createModel: (body: Partial<ModelDef> & { id: string }) =>
+    request<{ status: string; model: ModelDef }>('/models', { method: 'POST', body: JSON.stringify(body) }),
+  updateModel: (id: string, body: Partial<ModelDef>) =>
+    request<{ status: string; model: ModelDef }>(`/models/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteModel: (id: string) =>
+    request<{ status: string }>(`/models/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  listModelProviders: () =>
+    request<{ providers: ModelProviderInfo[] }>('/models/providers'),
 
   health: () => request<{ status: string; version: string; timestamp: string }>('/health'),
 }

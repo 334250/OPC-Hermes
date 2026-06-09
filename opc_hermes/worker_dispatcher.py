@@ -40,6 +40,50 @@ from opc_hermes.memory_layer.summary_bridge import SummaryBridgeEntry
 logger = logging.getLogger(__name__)
 
 
+def _infer_provider_from_model(model: str) -> str:
+    """Best-effort provider inference for legacy Worker.default_model values."""
+    lower = (model or "").strip().lower()
+    if not lower:
+        return ""
+    prefix = lower.split("/", 1)[0] if "/" in lower else ""
+    prefix_map = {
+        "anthropic": "anthropic",
+        "openai": "openai-api",
+        "google": "gemini",
+        "x-ai": "xai",
+        "deepseek": "deepseek",
+        "qwen": "alibaba",
+        "z-ai": "zai",
+        "moonshotai": "kimi-coding",
+        "mistralai": "mistral",
+        "minimax": "minimax",
+        "nvidia": "nvidia",
+    }
+    if prefix in prefix_map:
+        return prefix_map[prefix]
+    starts = (
+        ("claude", "anthropic"),
+        ("gpt-", "openai-api"),
+        ("o1", "openai-api"),
+        ("o3", "openai-api"),
+        ("o4", "openai-api"),
+        ("gemini", "gemini"),
+        ("gemma", "gemini"),
+        ("deepseek", "deepseek"),
+        ("grok", "xai"),
+        ("glm", "zai"),
+        ("kimi", "kimi-coding"),
+        ("qwen", "alibaba"),
+        ("mistral", "mistral"),
+        ("mixtral", "mistral"),
+        ("codestral", "mistral"),
+    )
+    for marker, provider in starts:
+        if lower.startswith(marker):
+            return provider
+    return ""
+
+
 # ── Failure strategy ─────────────────────────────────────────────────────
 
 class FailurePolicy(Enum):
@@ -384,6 +428,7 @@ class OPCWorkerDispatcher:
         step_index = step.get("index", -1)
         prompt = step.get("prompt", "")
         model = step.get("model_override", "")
+        provider = step.get("provider_override", "")
 
         # Resolve worker config
         worker = self.registry.get_worker(worker_id)
@@ -406,6 +451,7 @@ class OPCWorkerDispatcher:
 
         # Determine model
         effective_model = model or worker.default_model
+        effective_provider = provider or getattr(worker, "default_provider", "") or _infer_provider_from_model(effective_model)
         if not effective_model:
             from opc_hermes.model_prefs import resolve_model
             complexity = "MEDIUM"
@@ -420,6 +466,7 @@ class OPCWorkerDispatcher:
             worker_id=worker_id,
             prompt=prompt,
             system_prompt=system_prompt,
+            provider=effective_provider,
             model=effective_model,
             toolsets=toolsets,
             max_iterations=step.get("max_iterations", 60),

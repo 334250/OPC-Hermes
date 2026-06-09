@@ -46,6 +46,7 @@ class DelegateRequest:
     worker_id: str
     prompt: str                        # the worker's task prompt
     system_prompt: str = ""            # rendered from worker template
+    provider: str = ""                 # provider override ("" = inherit)
     model: str = ""                    # model override ("" = use worker default)
     toolsets: Optional[List[str]] = None
     max_iterations: int = 60
@@ -123,6 +124,8 @@ def _build_real_adapter() -> AdapterFn:
                     role="leaf",
                     context=request.context or None,
                     toolsets=request.toolsets,
+                    provider=request.provider or None,
+                    model=request.model or None,
                     max_iterations=request.max_iterations,
                     parent_agent=parent,
                 )

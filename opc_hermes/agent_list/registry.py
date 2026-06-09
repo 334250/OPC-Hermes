@@ -70,6 +70,7 @@ class WorkerDef:
     role: str                       # "worker" | "leader" | "evaluator"
     capabilities: List[str] = field(default_factory=list)  # what this worker can do
     skill_ids: List[str] = field(default_factory=list)     # skills this worker owns
+    default_provider: str = ""      # preferred provider for this worker
     default_model: str = ""         # preferred model for this worker
     model_tier: str = "standard"    # budget | standard | premium
     toolsets: List[str] = field(default_factory=list)      # toolset names
@@ -87,6 +88,7 @@ class WorkerDef:
             role=data.get("role", "worker"),
             capabilities=data.get("capabilities", []),
             skill_ids=data.get("skill_ids", []),
+            default_provider=data.get("default_provider", ""),
             default_model=data.get("default_model", ""),
             model_tier=data.get("model_tier", "standard"),
             toolsets=data.get("toolsets", []),

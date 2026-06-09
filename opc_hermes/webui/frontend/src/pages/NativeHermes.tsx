@@ -1,9 +1,44 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type HermesCronJob, type HermesEnvVarInfo, type HermesModelOptionProvider, type HermesSessionInfo, type HermesSessionMessage } from '../lib/api'
+import { api, type HermesCronJob, type HermesEnvVarInfo, type HermesProfileInfo, type HermesSessionInfo, type HermesSessionMessage, type ModelDef, type ModelProviderInfo } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error'
+
+function tierLabel(lang: string, tier: string) {
+  const labels: Record<string, Record<string, string>> = {
+    zh: { budget: '预算', standard: '标准', premium: '高级' },
+    en: { budget: 'Budget', standard: 'Standard', premium: 'Premium' },
+  }
+  return labels[lang]?.[tier] || tier
+}
+
+function envNameFromRef(value?: string | null) {
+  const raw = (value || '').trim()
+  if (!raw || raw === 'null') return ''
+  if (raw.startsWith('${') && raw.endsWith('}')) return raw.slice(2, -1).trim()
+  if (raw.startsWith('$')) return raw.slice(1).trim()
+  return raw
+}
+
+function apiKeyRefFromEnv(value: string) {
+  const env = envNameFromRef(value)
+  return env ? '${' + env + '}' : ''
+}
+
+function defaultApiKeyEnv(providerId: string) {
+  const cleaned = (providerId || 'custom').toUpperCase().replace(/[-.]/g, '_')
+  return `${cleaned}_API_KEY`
+}
+
+function complexityLabel(t: (key: string) => string, value: string) {
+  const labels: Record<string, string> = {
+    SIMPLE: 'modelComplexitySimple',
+    MEDIUM: 'modelComplexityMedium',
+    COMPLEX: 'modelComplexityComplex',
+  }
+  return t(labels[value] || value)
+}
 
 function formatTime(value?: number | string | null) {
   if (!value) return '-'
@@ -208,60 +243,52 @@ export function HermesSessionsPage() {
   )
 }
 
-function providerModels(providers: any[], slug: string): string[] {
-  const p = providers.find((p: any) => p.slug === slug || p.name === slug)
-  if (!p || !p.models) return []
-  // OPC catalog: models are objects with id/display_name
-  // Hermes: models are strings
-  return p.models.map((m: any) => (typeof m === 'string' ? m : m.id))
-}
-
-function providerModelDisplay(providers: any[], slug: string, modelId: string): string {
-  const p = providers.find((p: any) => p.slug === slug || p.name === slug)
-  if (!p || !p.models) return modelId
-  const m = p.models.find((m: any) => (typeof m === 'string' ? m === modelId : m.id === modelId))
-  if (!m) return modelId
-  return typeof m === 'string' ? m : (m.display_name || m.id)
-}
-
 export function HermesModelsPage() {
-  const { lang } = useI18n()
+  const { lang, t } = useI18n()
   const [state, setState] = useState<LoadState>('loading')
   const [error, setError] = useState('')
-  const [info, setInfo] = useState<any>(null)
-  const [providers, setProviders] = useState<HermesModelOptionProvider[]>([])
-  const [aux, setAux] = useState<any[]>([])
-  const [provider, setProvider] = useState('')
-  const [model, setModel] = useState('')
-  const [auxDraft, setAuxDraft] = useState<Record<string, { provider: string; model: string }>>({})
-  const [saving, setSaving] = useState('')
+  const [models, setModels] = useState<ModelDef[]>([])
+  const [providers, setProviders] = useState<ModelProviderInfo[]>([])
+  const [catalog, setCatalog] = useState<any[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [keyEditingId, setKeyEditingId] = useState<string | null>(null)
+  const [keyEnv, setKeyEnv] = useState('')
+  const [keyValue, setKeyValue] = useState('')
+
+  // Form state
+  const [fId, setFId] = useState('')
+  const [fCustomModelId, setFCustomModelId] = useState(false)
+  const [fDisplayName, setFDisplayName] = useState('')
+  const [fProvider, setFProvider] = useState('')
+  const [fTier, setFTier] = useState('standard')
+  const [fContextLength, setFContextLength] = useState(128000)
+  const [fApiBase, setFApiBase] = useState('')
+  const [fApiKeyRef, setFApiKeyRef] = useState('')
+  const [fApiKeyValue, setFApiKeyValue] = useState('')
+  const [fActive, setFActive] = useState(true)
+  const [fDescription, setFDescription] = useState('')
+  const [fVision, setFVision] = useState(false)
+  const [fTools, setFTools] = useState(true)
+  const [fImageGen, setFImageGen] = useState(false)
+  const [fAudioStt, setFAudioStt] = useState(false)
+  const [fSimple, setFSimple] = useState(true)
+  const [fMedium, setFMedium] = useState(true)
+  const [fComplex, setFComplex] = useState(false)
 
   const load = useCallback(async () => {
     setState('loading')
     setError('')
     try {
-      const [modelInfo, options, auxiliary, catalog] = await Promise.all([
-        api.hermesModelInfo().catch(() => null),
-        api.hermesModelOptions().catch(() => ({ providers: [] })),
-        api.hermesAuxiliaryModels().catch(() => ({ main: { provider: '', model: '' }, tasks: [] })),
-        fetch('/api/hermes/opc-model-catalog').then(r => r.json()).catch(() => ({ providers: [] })),
+      const [modelsRes, providersRes] = await Promise.all([
+        api.listModels(),
+        api.listModelProviders(),
       ])
-      const opcProviders = catalog?.providers ?? []
-      const hermesProviders = options?.providers ?? []
-      const mergedMap = new Map<string, any>()
-      for (const p of opcProviders) mergedMap.set(p.slug || p.name, p)
-      for (const p of hermesProviders) {
-        if (!mergedMap.has(p.slug || p.name)) mergedMap.set(p.slug || p.name, p)
-      }
-      const mergedProviders = Array.from(mergedMap.values())
-      const currentProvider = modelInfo?.provider || (options as any)?.provider || auxiliary?.main?.provider || mergedProviders[0]?.slug || ''
-      const currentModel = modelInfo?.model || (options as any)?.model || auxiliary?.main?.model || ''
-      setInfo(modelInfo || {})
-      setProviders(mergedProviders)
-      setAux(auxiliary?.tasks ?? [])
-      setProvider(currentProvider)
-      setModel(currentModel)
-      setAuxDraft(Object.fromEntries((auxiliary?.tasks ?? []).map((row) => [row.task, { provider: row.provider, model: row.model }])))
+      setModels(modelsRes.models ?? [])
+      setProviders(providersRes.providers ?? [])
       setState('ready')
     } catch (e: any) {
       setError(e.message)
@@ -271,29 +298,696 @@ export function HermesModelsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const saveMain = async () => {
-    setSaving('main')
+  // Lazy-load catalog only when needed (for add/edit dropdowns)
+  const loadCatalog = useCallback(async () => {
+    if (catalog.length > 0 || catalogLoading) return
+    setCatalogLoading(true)
     try {
-      await api.hermesSetModel({ scope: 'main', provider, model })
-      await load()
+      const res = await fetch('/api/hermes/opc-model-catalog').then(r => r.json())
+      setCatalog(res.providers ?? [])
+    } catch {
+      // dropdowns will fall back to providers list
     } finally {
-      setSaving('')
+      setCatalogLoading(false)
+    }
+  }, [catalog.length, catalogLoading])
+
+  const resetForm = () => {
+    setFId('')
+    setFCustomModelId(false)
+    setFDisplayName('')
+    setFProvider('')
+    setFTier('standard')
+    setFContextLength(128000)
+    setFApiBase('')
+    setFApiKeyRef('')
+    setFApiKeyValue('')
+    setFActive(true)
+    setFDescription('')
+    setFVision(false)
+    setFTools(true)
+    setFImageGen(false)
+    setFAudioStt(false)
+    setFSimple(true)
+    setFMedium(true)
+    setFComplex(false)
+  }
+
+  const startAdd = () => {
+    resetForm()
+    setAdding(true)
+    setEditingId(null)
+    setKeyEditingId(null)
+  }
+
+  const startEdit = (m: ModelDef) => {
+    setFId(m.id)
+    setFCustomModelId(false)
+    setFDisplayName(m.display_name)
+    setFProvider(m.provider)
+    setFTier(m.tier)
+    setFContextLength(m.context_length)
+    setFApiBase(m.api_base || '')
+    setFApiKeyRef(m.api_key_ref || '')
+    setFApiKeyValue('')
+    setFActive(m.active)
+    setFDescription(m.description)
+    setFVision(m.capabilities?.vision || false)
+    setFTools(m.capabilities?.tool_calling ?? true)
+    setFImageGen(m.capabilities?.image_gen || false)
+    setFAudioStt(m.capabilities?.audio_stt || false)
+    setFSimple(m.suitable_complexity?.includes('SIMPLE') ?? true)
+    setFMedium(m.suitable_complexity?.includes('MEDIUM') ?? true)
+    setFComplex(m.suitable_complexity?.includes('COMPLEX') || false)
+    setEditingId(m.id)
+    setAdding(false)
+    setKeyEditingId(null)
+  }
+
+  const cancelForm = () => {
+    setAdding(false)
+    setEditingId(null)
+  }
+
+  const buildPayload = () => {
+    const complexity: string[] = []
+    if (fSimple) complexity.push('SIMPLE')
+    if (fMedium) complexity.push('MEDIUM')
+    if (fComplex) complexity.push('COMPLEX')
+    return {
+      id: fId.trim(),
+      display_name: fDisplayName.trim() || fId.trim(),
+      provider: fProvider.trim(),
+      tier: fTier,
+      context_length: fContextLength,
+      capabilities: {
+        vision: fVision,
+        tool_calling: fTools,
+        image_gen: fImageGen,
+        audio_stt: fAudioStt,
+      },
+      suitable_complexity: complexity,
+      api_base: fApiBase.trim() || null,
+      api_key_ref: apiKeyRefFromEnv(fApiKeyRef.trim()) || null,
+      active: fActive,
+      description: fDescription.trim(),
     }
   }
 
-  const saveAux = async (task: string) => {
-    const draft = auxDraft[task]
-    if (!draft) return
-    setSaving(task)
+  const handleSave = async () => {
+    if (!fId.trim()) return
+    setSaving(true)
+    setMessage('')
     try {
-      await api.hermesSetModel({ scope: 'auxiliary', provider: draft.provider, model: draft.model, task })
-      await load()
+      const payload = buildPayload()
+      const apiKeyEnv = envNameFromRef(fApiKeyRef) || defaultApiKeyEnv(payload.provider || 'custom')
+      if (fApiKeyValue.trim()) {
+        await api.hermesSaveModelBinding({
+          provider_id: payload.provider || 'custom',
+          provider_name: providers.find(p => p.id === payload.provider)?.name || payload.provider || 'Custom',
+          api_base: payload.api_base || '',
+          api_key: fApiKeyValue.trim(),
+          api_key_env: apiKeyEnv,
+          model_id: payload.id,
+          display_name: payload.display_name,
+          tier: payload.tier,
+          context_length: payload.context_length,
+          capabilities: payload.capabilities,
+          suitable_complexity: payload.suitable_complexity,
+          description: payload.description,
+        })
+        if (!payload.active) {
+          await api.updateModel(payload.id, { active: false, api_key_ref: apiKeyRefFromEnv(apiKeyEnv) })
+        }
+        setMessage(editingId ? t('modelUpdated') : t('modelCreated'))
+      } else if (editingId) {
+        await api.updateModel(editingId, payload)
+        setMessage(t('modelUpdated'))
+      } else {
+        await api.createModel(payload as ModelDef)
+        setMessage(t('modelCreated'))
+      }
+      cancelForm()
+      try {
+        await load()
+      } catch {
+        // keep the success message even if refresh fails
+      }
+    } catch (e: any) {
+      setMessage(`${t('modelSaveFailed')}: ${e.message}`)
     } finally {
-      setSaving('')
+      setSaving(false)
     }
   }
 
-  const mainModels = providerModels(providers, provider)
+  const handleDelete = async (id: string) => {
+    if (!window.confirm(lang === 'zh' ? `确定删除模型 ${id}？` : `Delete model ${id}?`)) return
+    setSaving(true)
+    setMessage('')
+    try {
+      await api.deleteModel(id)
+      setMessage(t('modelDeleted'))
+      await load()
+    } catch (e: any) {
+      setMessage(`${t('modelDeleteFailed')}: ${e.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const startKeyEdit = (m: ModelDef) => {
+    const provider = providers.find(p => p.id === m.provider)
+    setKeyEditingId(m.id)
+    setKeyEnv(envNameFromRef(m.api_key_ref) || envNameFromRef(provider?.api_key_ref) || defaultApiKeyEnv(m.provider))
+    setKeyValue('')
+    setMessage('')
+  }
+
+  const cancelKeyEdit = () => {
+    setKeyEditingId(null)
+    setKeyEnv('')
+    setKeyValue('')
+  }
+
+  const saveApiKey = async (m: ModelDef) => {
+    const env = envNameFromRef(keyEnv)
+    if (!env || !keyValue.trim()) return
+    setSaving(true)
+    setMessage('')
+    try {
+      await api.hermesSaveModelBinding({
+        provider_id: m.provider || 'custom',
+        provider_name: providers.find(p => p.id === m.provider)?.name || m.provider || 'Custom',
+        api_base: m.api_base || '',
+        api_key: keyValue.trim(),
+        api_key_env: env,
+        model_id: m.id,
+        display_name: m.display_name || m.id,
+        tier: m.tier,
+        context_length: m.context_length,
+        capabilities: m.capabilities,
+        suitable_complexity: m.suitable_complexity,
+        description: m.description,
+      })
+      if (!m.active) {
+        await api.updateModel(m.id, { active: m.active, api_key_ref: apiKeyRefFromEnv(env) })
+      }
+      setMessage(t('modelKeyUpdated'))
+      cancelKeyEdit()
+      try {
+        await load()
+      } catch {
+        setModels(current => current.map(item => item.id === m.id ? { ...item, api_key_ref: apiKeyRefFromEnv(env) } : item))
+      }
+    } catch (e: any) {
+      setMessage(`${t('modelKeyUpdateFailed')}: ${e.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Only show models that have been configured (api_base is set)
+  const configuredModels = useMemo(() =>
+    models.filter(m => m.api_base && m.api_base.trim()),
+    [models]
+  )
+
+  // Models for the currently selected provider (from catalog)
+  const providerCatalogModels = useMemo(() => {
+    const cp = catalog.find((p: any) => (p.slug || p.id) === fProvider)
+    return cp?.models ?? []
+  }, [catalog, fProvider])
+
+  // Mainstream providers to show in the dropdown
+  const MAINSTREAM_PROVIDERS = new Set([
+    'openai', 'openai-api',
+    'anthropic',
+    'google', 'gemini',
+    'deepseek',
+    'xai', 'grok',
+    'alibaba', 'qwen',
+    'zhipu', 'zai', 'glm',
+    'xiaomi', 'mi',
+    'meta', 'llama',
+    'mistral',
+  ])
+
+  const catalogProviderOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const opts: { id: string; name: string }[] = []
+    for (const p of catalog) {
+      const id = (p.slug || p.id || '').toLowerCase()
+      if (!id || seen.has(id)) continue
+      if (!MAINSTREAM_PROVIDERS.has(id)) continue
+      seen.add(id)
+      opts.push({ id, name: p.name || id })
+    }
+    // Also include providers from listModelProviders that aren't in catalog
+    for (const p of providers) {
+      const id = p.id.toLowerCase()
+      if (!seen.has(id) && MAINSTREAM_PROVIDERS.has(id)) {
+        seen.add(id)
+        opts.push({ id: p.id, name: p.name })
+      }
+    }
+    // Always include the currently selected provider (for editing non-mainstream models)
+    if (fProvider && !seen.has(fProvider.toLowerCase())) {
+      opts.push({ id: fProvider, name: fProvider })
+    }
+    return opts
+  }, [catalog, providers, fProvider])
+
+  const chooseProvider = (nextProvider: string) => {
+    setFProvider(nextProvider)
+    // Try to auto-fill api_base from catalog or provider list
+    const cp = catalog.find((p: any) => (p.slug || p.id) === nextProvider)
+    const pp = providers.find(p => p.id === nextProvider)
+    if (!fApiBase.trim()) {
+      setFApiBase(cp?.api_base || pp?.api_base || '')
+    }
+    if (!fApiKeyRef.trim()) {
+      setFApiKeyRef(cp?.api_key_ref || pp?.api_key_ref || '')
+    }
+  }
+
+  const chooseCatalogModel = (modelId: string) => {
+    if (!modelId) {
+      setFCustomModelId(false)
+      setFId('')
+      setFDisplayName('')
+      return
+    }
+    if (modelId === '__custom__') {
+      setFCustomModelId(true)
+      setFId('')
+      setFDisplayName('')
+      return
+    }
+    setFCustomModelId(false)
+    setFId(modelId)
+    const cm = providerCatalogModels.find((m: any) => (typeof m === 'string' ? m === modelId : m.id === modelId))
+    if (cm && typeof cm === 'object') {
+      setFDisplayName(cm.display_name || modelId)
+      setFTier(cm.tier || 'standard')
+      setFContextLength(cm.context_length || 128000)
+      setFVision(cm.capabilities?.vision || false)
+      setFTools(cm.capabilities?.tool_calling ?? true)
+      setFImageGen(cm.capabilities?.image_gen || false)
+      setFAudioStt(cm.capabilities?.audio_stt || false)
+      setFSimple((cm.suitable_complexity || []).includes('SIMPLE'))
+      setFMedium((cm.suitable_complexity || []).includes('MEDIUM'))
+      setFComplex((cm.suitable_complexity || []).includes('COMPLEX'))
+      setFDescription(cm.description || '')
+      if (!fApiBase.trim()) setFApiBase(cm.api_base || '')
+    }
+  }
+
+  const showForm = adding || editingId !== null
+
+  // Trigger catalog load when form opens
+  useEffect(() => {
+    if (showForm) loadCatalog()
+  }, [showForm, loadCatalog])
+
+  const tierOptions = ['budget', 'standard', 'premium']
+
+  if (state === 'loading') return <LoadingBlock />
+  if (state === 'error') return <ErrorBlock message={error} onRetry={() => load()} />
+
+  return (
+    <div>
+      <PageHeader
+        title={t('modelConfigTitle')}
+        subtitle={t('modelConfigSubtitle')}
+        action={<>
+          <span className={`text-xs ${message.includes('失败') || message.includes('failed') ? 'text-red-400' : 'text-green-400'}`}>{message}</span>
+          <button className="btn-secondary text-xs" onClick={load}>{t('refresh')}</button>
+          {!showForm && <button className="btn-primary text-xs" onClick={startAdd}>{t('addModel')}</button>}
+        </>}
+      />
+
+      {showForm && (
+        <div className="card mb-4 border-opc-accent/40 bg-opc-accent/5">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">
+              {editingId ? `${t('editModel')}: ${editingId}` : t('addModelTitle')}
+            </h3>
+            <button className="btn-secondary text-xs" onClick={cancelForm}>{t('cancel')}</button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('modelIdRequired')}</span>
+              {providerCatalogModels.length > 0 ? (
+                <select className="input" value={fCustomModelId ? '__custom__' : fId} onChange={e => chooseCatalogModel(e.target.value)} disabled={!!editingId}>
+                  <option value="">{t('selectModelOption')}</option>
+                  {providerCatalogModels.map((m: any) => {
+                    const mid = typeof m === 'string' ? m : m.id
+                    const mname = typeof m === 'string' ? m : (m.display_name || m.id)
+                    return <option key={mid} value={mid}>{mname}</option>
+                  })}
+                  <option value="__custom__">{t('customOption')}</option>
+                </select>
+              ) : (
+                <input className="input" value={fId} onChange={e => setFId(e.target.value)} placeholder="e.g. claude-sonnet-4" disabled={!!editingId} />
+              )}
+              {fCustomModelId && (
+                <input className="input mt-2" value={fId} onChange={e => { setFId(e.target.value); setFDisplayName(e.target.value) }} placeholder={t('customModelIdPlaceholder')} autoFocus />
+              )}
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('displayName')}</span>
+              <input className="input" value={fDisplayName} onChange={e => setFDisplayName(e.target.value)} placeholder="e.g. Claude Sonnet 4" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('provider')}</span>
+              <select className="input" value={fProvider} onChange={e => chooseProvider(e.target.value)}>
+                <option value="">{t('selectProviderOption')}</option>
+                {catalogProviderOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('tier')}</span>
+              <select className="input" value={fTier} onChange={e => setFTier(e.target.value)}>
+                {tierOptions.map(tier => <option key={tier} value={tier}>{tierLabel(lang, tier)}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('contextLength')}</span>
+              <input className="input" type="number" min="0" value={fContextLength} onChange={e => setFContextLength(Math.max(0, Number(e.target.value) || 0))} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('apiBaseUrl')}</span>
+              <input className="input" value={fApiBase} onChange={e => setFApiBase(e.target.value)} placeholder="https://api.example.com/v1" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('apiKeyRef')}</span>
+              <input className="input" value={fApiKeyRef} onChange={e => setFApiKeyRef(e.target.value)} placeholder="OPENAI_API_KEY" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('newApiKey')}</span>
+              <input className="input" type="password" value={fApiKeyValue} onChange={e => setFApiKeyValue(e.target.value)} placeholder={t('apiKeyValuePlaceholder')} autoComplete="new-password" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('status')}</span>
+              <select className="input" value={fActive ? 'true' : 'false'} onChange={e => setFActive(e.target.value === 'true')}>
+                <option value="true">{t('active')}</option>
+                <option value="false">{t('inactive')}</option>
+              </select>
+            </label>
+            <label className="block md:col-span-3">
+              <span className="mb-1 block text-xs text-opc-text-2">{t('description')}</span>
+              <input className="input" value={fDescription} onChange={e => setFDescription(e.target.value)} placeholder={t('modelDescriptionPlaceholder')} />
+            </label>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <fieldset className="rounded-lg border border-opc-border p-3">
+              <legend className="text-xs font-semibold text-opc-text-2 px-1">{t('capabilities')}</legend>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fTools} onChange={e => setFTools(e.target.checked)} /> {t('modelCapabilityTools')}</label>
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fVision} onChange={e => setFVision(e.target.checked)} /> {t('modelCapabilityVision')}</label>
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fImageGen} onChange={e => setFImageGen(e.target.checked)} /> {t('modelCapabilityImageGen')}</label>
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fAudioStt} onChange={e => setFAudioStt(e.target.checked)} /> {t('modelCapabilityAudioStt')}</label>
+              </div>
+            </fieldset>
+            <fieldset className="rounded-lg border border-opc-border p-3">
+              <legend className="text-xs font-semibold text-opc-text-2 px-1">{t('suitableComplexity')}</legend>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fSimple} onChange={e => setFSimple(e.target.checked)} /> {t('modelComplexitySimple')}</label>
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fMedium} onChange={e => setFMedium(e.target.checked)} /> {t('modelComplexityMedium')}</label>
+                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={fComplex} onChange={e => setFComplex(e.target.checked)} /> {t('modelComplexityComplex')}</label>
+              </div>
+            </fieldset>
+          </div>
+          <div className="mt-4">
+            <button className="btn-primary text-xs" disabled={!fId.trim() || saving} onClick={handleSave}>
+              {saving ? t('saving') : (editingId ? t('updateModel') : t('createModel'))}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {configuredModels.length === 0 && !showForm ? (
+        <div className="py-16 text-center">
+          <p className="text-sm text-opc-text-2 mb-4">{t('noConfiguredModels')}</p>
+          <button className="btn-primary text-xs" onClick={startAdd}>{t('addModel')}</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {configuredModels.map(m => (
+            <div key={m.id} className={`card flex flex-col ${!m.active ? 'opacity-50' : ''}`}>
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold truncate">{m.display_name || m.id}</h3>
+                  <div className="font-mono text-xs text-opc-text-2 truncate">{m.id}</div>
+                </div>
+                <span className={`badge shrink-0 ${m.tier === 'premium' ? 'badge-accent' : m.tier === 'standard' ? 'badge-info' : 'badge-success'}`}>{tierLabel(lang, m.tier)}</span>
+              </div>
+
+              <div className="mb-3 flex flex-wrap gap-1">
+                <span className="badge text-xs">{m.provider || 'custom'}</span>
+                {m.context_length > 0 && <span className="badge text-xs">{Math.round(m.context_length / 1000)}K {t('contextShort')}</span>}
+                {m.capabilities?.tool_calling && <span className="badge-success text-xs" aria-label={t('modelCapabilityTools')}>🔧</span>}
+                {m.capabilities?.vision && <span className="badge-info text-xs" aria-label={t('modelCapabilityVision')}>👁</span>}
+                {m.capabilities?.image_gen && <span className="badge-accent text-xs" aria-label={t('modelCapabilityImageGen')}>🖼</span>}
+                {m.capabilities?.audio_stt && <span className="badge-warning text-xs" aria-label={t('modelCapabilityAudioStt')}>🎤</span>}
+                {!m.active && <span className="badge-warning text-xs">{t('inactive')}</span>}
+              </div>
+
+              {m.api_base && (
+                <div className="mb-1 text-xs text-opc-text-2 truncate" title={m.api_base}>
+                  {t('apiLabel')}: {m.api_base}
+                </div>
+              )}
+              {m.api_key_ref && m.api_key_ref !== 'null' && (
+                <div className="mb-1 text-xs text-opc-text-2 truncate">
+                  {t('apiKeyLabel')}: {m.api_key_ref}
+                </div>
+              )}
+              {keyEditingId === m.id && (
+                <div className="mb-3 rounded-lg border border-opc-border bg-opc-bg p-3">
+                  <div className="mb-2 text-xs font-semibold text-opc-text-2">{t('editApiKey')}</div>
+                  <div className="space-y-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs text-opc-text-2">{t('apiKeyEnv')}</span>
+                      <input className="input" value={keyEnv} onChange={e => setKeyEnv(e.target.value)} placeholder="OPENAI_API_KEY" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs text-opc-text-2">{t('newApiKey')}</span>
+                      <input className="input" type="password" value={keyValue} onChange={e => setKeyValue(e.target.value)} placeholder={t('apiKeyValuePlaceholder')} autoComplete="new-password" />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="btn-primary flex-1 justify-center text-xs" disabled={saving || !envNameFromRef(keyEnv) || !keyValue.trim()} onClick={() => saveApiKey(m)}>
+                      {saving ? t('saving') : t('saveApiKey')}
+                    </button>
+                    <button className="btn-secondary flex-1 justify-center text-xs" disabled={saving} onClick={cancelKeyEdit}>
+                      {t('cancel')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {m.suitable_complexity?.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {m.suitable_complexity.map(c => (
+                    <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-opc-surface-2 text-opc-text-2">{complexityLabel(t, c)}</span>
+                  ))}
+                </div>
+              )}
+              {m.description && (
+                <p className="mb-3 text-xs text-opc-text-2 leading-relaxed flex-1">{m.description}</p>
+              )}
+
+              <div className="mt-auto flex flex-wrap gap-2 pt-3 border-t border-opc-border">
+                <button className="btn-secondary text-xs flex-1 justify-center" onClick={() => startEdit(m)} disabled={saving}>
+                  {t('edit')}
+                </button>
+                <button className="btn-secondary text-xs flex-1 justify-center" onClick={() => startKeyEdit(m)} disabled={saving || keyEditingId === m.id}>
+                  {t('editApiKeyShort')}
+                </button>
+                <button className="btn-danger text-xs flex-1 justify-center" onClick={() => handleDelete(m.id)} disabled={saving}>
+                  {t('delete')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function profileModelSummary(profile: HermesProfileInfo) {
+  const provider = asText(profile.provider).trim()
+  const model = asText(profile.model).trim()
+  if (provider && model) return `${provider} / ${model}`
+  return model || provider || '-'
+}
+
+export function HermesProfilesPage() {
+  const { lang } = useI18n()
+  const [state, setState] = useState<LoadState>('loading')
+  const [error, setError] = useState('')
+  const [profiles, setProfiles] = useState<HermesProfileInfo[]>([])
+  const [selectedName, setSelectedName] = useState<string | null>(null)
+  const [setupCommand, setSetupCommand] = useState('')
+  const [soulContent, setSoulContent] = useState('')
+  const [soulExists, setSoulExists] = useState(false)
+  const [soulDirty, setSoulDirty] = useState(false)
+  const [detailVersion, setDetailVersion] = useState(0)
+  const [detailError, setDetailError] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState('')
+  const [form, setForm] = useState({ name: '', clone_from_default: true, no_skills: false })
+  const [renameSource, setRenameSource] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+
+  const load = useCallback(async () => {
+    setState('loading')
+    setError('')
+    try {
+      const data = await api.hermesProfiles()
+      const rows = data.profiles ?? []
+      setProfiles(rows)
+      setSelectedName((current) => {
+        if (current && rows.some((profile) => profile.name === current)) return current
+        return rows[0]?.name ?? null
+      })
+      setState('ready')
+    } catch (e: any) {
+      setError(e.message)
+      setState('error')
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const selectedProfile = useMemo(
+    () => profiles.find((profile) => profile.name === selectedName) ?? null,
+    [profiles, selectedName],
+  )
+
+  useEffect(() => {
+    if (!selectedName) {
+      setSetupCommand('')
+      setSoulContent('')
+      setSoulExists(false)
+      setSoulDirty(false)
+      setDetailError('')
+      return
+    }
+    let active = true
+    setDetailError('')
+    setSetupCommand('')
+    setSoulDirty(false)
+    Promise.all([
+      api.hermesProfileSetupCommand(selectedName),
+      api.hermesProfileSoul(selectedName),
+    ]).then(([setup, soul]) => {
+      if (!active) return
+      setSetupCommand(setup.command || '')
+      setSoulContent(soul.content || '')
+      setSoulExists(!!soul.exists)
+    }).catch((e: any) => {
+      if (!active) return
+      setDetailError(e.message)
+      setSoulContent('')
+      setSoulExists(false)
+    })
+    return () => { active = false }
+  }, [selectedName, detailVersion])
+
+  const createProfile = async () => {
+    const name = form.name.trim()
+    if (!name) return
+    setBusy('create')
+    setMessage('')
+    try {
+      await api.hermesCreateProfile({
+        name,
+        clone_from_default: form.clone_from_default,
+        no_skills: form.clone_from_default ? false : form.no_skills,
+      })
+      setForm({ name: '', clone_from_default: true, no_skills: false })
+      setSelectedName(name)
+      setMessage(lang === 'zh' ? 'Profile 已创建' : 'Profile created')
+      await load()
+    } catch (e: any) {
+      setMessage(`${lang === 'zh' ? '创建失败' : 'Create failed'}: ${e.message}`)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const startRename = (profile: HermesProfileInfo) => {
+    setRenameSource(profile.name)
+    setRenameValue(profile.name)
+    setMessage('')
+  }
+
+  const saveRename = async (profile: HermesProfileInfo) => {
+    const newName = renameValue.trim()
+    if (!newName || newName === profile.name) {
+      setRenameSource(null)
+      return
+    }
+    setBusy(`rename-${profile.name}`)
+    setMessage('')
+    try {
+      await api.hermesRenameProfile(profile.name, newName)
+      setRenameSource(null)
+      setSelectedName(newName)
+      setMessage(lang === 'zh' ? 'Profile 已重命名' : 'Profile renamed')
+      await load()
+    } catch (e: any) {
+      setMessage(`${lang === 'zh' ? '重命名失败' : 'Rename failed'}: ${e.message}`)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const deleteProfile = async (profile: HermesProfileInfo) => {
+    if (profile.is_default) return
+    const confirmed = window.confirm(lang === 'zh' ? `确定删除 Profile ${profile.name}？` : `Delete profile ${profile.name}?`)
+    if (!confirmed) return
+    setBusy(`delete-${profile.name}`)
+    setMessage('')
+    try {
+      await api.hermesDeleteProfile(profile.name)
+      if (selectedName === profile.name) setSelectedName(null)
+      setMessage(lang === 'zh' ? 'Profile 已删除' : 'Profile deleted')
+      await load()
+    } catch (e: any) {
+      setMessage(`${lang === 'zh' ? '删除失败' : 'Delete failed'}: ${e.message}`)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const saveSoul = async () => {
+    if (!selectedName) return
+    setBusy('soul')
+    setMessage('')
+    try {
+      await api.hermesSaveProfileSoul(selectedName, soulContent)
+      setSoulDirty(false)
+      setSoulExists(true)
+      setMessage(lang === 'zh' ? 'SOUL.md 已保存' : 'SOUL.md saved')
+    } catch (e: any) {
+      setMessage(`${lang === 'zh' ? '保存失败' : 'Save failed'}: ${e.message}`)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const copySetupCommand = async () => {
+    if (!setupCommand) return
+    try {
+      await navigator.clipboard.writeText(setupCommand)
+      setMessage(lang === 'zh' ? '命令已复制' : 'Command copied')
+    } catch {
+      setMessage(setupCommand)
+    }
+  }
 
   if (state === 'loading') return <LoadingBlock />
   if (state === 'error') return <ErrorBlock message={error} onRetry={load} />
@@ -301,85 +995,153 @@ export function HermesModelsPage() {
   return (
     <div>
       <PageHeader
-        title={lang === 'zh' ? 'Hermes 模型' : 'Hermes Models'}
-        subtitle={lang === 'zh' ? '迁入原生模型信息、Provider 模型选择和辅助任务模型分配。保存后影响新会话。' : 'Native model metadata, provider choices, and auxiliary task assignments. Saves affect new sessions.'}
-        action={<button className="btn-secondary text-xs" onClick={load}>{lang === 'zh' ? '刷新' : 'Refresh'}</button>}
+        title={lang === 'zh' ? 'Hermes Profiles' : 'Hermes Profiles'}
+        subtitle={lang === 'zh' ? '管理原生 Hermes Profile，支持创建、重命名、删除、查看 setup 命令和编辑 SOUL.md。' : 'Manage native Hermes profiles, setup commands, and SOUL.md content.'}
+        action={<>
+          <span className={`text-xs ${message.includes('失败') || message.includes('failed') ? 'text-red-400' : 'text-green-400'}`}>{message}</span>
+          <button className="btn-secondary text-xs" onClick={load}>{lang === 'zh' ? '刷新' : 'Refresh'}</button>
+        </>}
       />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="card xl:col-span-1">
-          <h3 className="mb-4 text-sm font-semibold">{lang === 'zh' ? '当前主模型' : 'Current Main Model'}</h3>
-          <div className="space-y-3 text-sm">
-            <InfoRow label="Provider" value={info?.provider || '-'} />
-            <InfoRow label="Model" value={info?.model || '-'} />
-            <InfoRow label="Context" value={String(info?.effective_context_length || 0)} />
-            <InfoRow label="Tools" value={info?.capabilities?.supports_tools ? 'yes' : 'no'} />
-            <InfoRow label="Vision" value={info?.capabilities?.supports_vision ? 'yes' : 'no'} />
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <div className="card">
+            <h3 className="mb-3 text-sm font-semibold">{lang === 'zh' ? '新建 Profile' : 'New Profile'}</h3>
+            <div className="space-y-3">
+              <input
+                className="input"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder={lang === 'zh' ? 'profile-name' : 'profile-name'}
+              />
+              <label className="flex items-center gap-2 text-xs text-opc-text-2">
+                <input
+                  type="checkbox"
+                  checked={form.clone_from_default}
+                  onChange={(e) => setForm({ ...form, clone_from_default: e.target.checked, no_skills: e.target.checked ? false : form.no_skills })}
+                />
+                {lang === 'zh' ? '从 default 复制配置和技能' : 'Clone config and skills from default'}
+              </label>
+              <label className="flex items-center gap-2 text-xs text-opc-text-2">
+                <input
+                  type="checkbox"
+                  checked={form.no_skills}
+                  disabled={form.clone_from_default}
+                  onChange={(e) => setForm({ ...form, no_skills: e.target.checked })}
+                />
+                {lang === 'zh' ? '创建空技能 Profile' : 'Create without bundled skills'}
+              </label>
+              <button className="btn-primary w-full justify-center text-xs" disabled={busy === 'create' || !form.name.trim()} onClick={createProfile}>
+                {busy === 'create' ? (lang === 'zh' ? '创建中...' : 'Creating...') : (lang === 'zh' ? '创建' : 'Create')}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {profiles.length ? profiles.map((profile) => {
+              const selected = profile.name === selectedName
+              const renaming = renameSource === profile.name
+              return (
+                <div key={profile.name} className={`card ${selected ? 'border-opc-accent/50 bg-opc-accent/5' : ''}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{profile.name}</div>
+                      <div className="mt-1 truncate font-mono text-xs text-opc-text-2">{profile.path}</div>
+                    </div>
+                    <StatusBadge active={profile.has_env} trueLabel=".env" falseLabel="no .env" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {profile.is_default && <span className="badge-accent text-xs">default</span>}
+                    <span className="badge text-xs">{profile.skill_count} skills</span>
+                    <span className="badge-info text-xs">{profileModelSummary(profile)}</span>
+                  </div>
+
+                  {renaming ? (
+                    <div className="mt-3 space-y-2">
+                      <input className="input" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus />
+                      <div className="flex gap-2">
+                        <button className="btn-primary flex-1 justify-center text-xs" disabled={busy === `rename-${profile.name}` || !renameValue.trim()} onClick={() => saveRename(profile)}>{lang === 'zh' ? '保存' : 'Save'}</button>
+                        <button className="btn-secondary flex-1 justify-center text-xs" disabled={busy === `rename-${profile.name}`} onClick={() => setRenameSource(null)}>{lang === 'zh' ? '取消' : 'Cancel'}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-opc-border pt-3">
+                      <button className="btn-secondary flex-1 justify-center text-xs" onClick={() => setSelectedName(profile.name)}>{lang === 'zh' ? '查看' : 'View'}</button>
+                      <button className="btn-secondary flex-1 justify-center text-xs" disabled={profile.is_default || !!busy} onClick={() => startRename(profile)}>{lang === 'zh' ? '重命名' : 'Rename'}</button>
+                      <button className="btn-danger flex-1 justify-center text-xs" disabled={profile.is_default || !!busy} onClick={() => deleteProfile(profile)}>{lang === 'zh' ? '删除' : 'Delete'}</button>
+                    </div>
+                  )}
+                </div>
+              )
+            }) : <div className="card"><EmptyBlock label={lang === 'zh' ? '暂无 Profile' : 'No profiles'} /></div>}
           </div>
         </div>
-        <div className="card xl:col-span-2">
-          <h3 className="mb-4 text-sm font-semibold">{lang === 'zh' ? '设置主模型' : 'Set Main Model'}</h3>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <select className="input" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(providerModels(providers, e.target.value)[0] ?? '') }}>
-              {providers.map((p) => <option key={p.slug || p.name} value={p.slug || p.name}>{p.name || p.slug} {p.total_models ? `(${p.total_models})` : ''}</option>)}
-            </select>
-            {mainModels.length ? (
-              <select className="input" value={model} onChange={(e) => setModel(e.target.value)}>
-                {mainModels.map((m: string) => <option key={m} value={m}>{providerModelDisplay(providers, provider, m)}</option>)}
-              </select>
-            ) : (
-              <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="provider/model" />
-            )}
-          </div>
-          <button className="btn-primary mt-4 text-xs" disabled={!provider || !model || saving === 'main'} onClick={saveMain}>{lang === 'zh' ? '保存主模型' : 'Save Main Model'}</button>
-        </div>
-      </div>
-      <div className="card mt-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">{lang === 'zh' ? '辅助模型' : 'Auxiliary Models'}</h3>
-          <button className="btn-secondary text-xs" disabled={saving === '__reset__'} onClick={async () => { setSaving('__reset__'); await api.hermesSetModel({ scope: 'auxiliary', provider: 'auto', model: '', task: '__reset__' }); setSaving(''); load() }}>{lang === 'zh' ? '全部重置为 auto' : 'Reset All to Auto'}</button>
-        </div>
-        <div className="overflow-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wider text-opc-text-2">
-              <tr><th className="py-2">Task</th><th>Provider</th><th>Model</th><th className="w-24"></th></tr>
-            </thead>
-            <tbody className="divide-y divide-opc-border">
-              {aux.map((row) => {
-                const draft = auxDraft[row.task] ?? { provider: row.provider, model: row.model }
-                const models = providerModels(providers, draft.provider)
-                return (
-                  <tr key={row.task}>
-                    <td className="py-3 font-medium">{row.task}</td>
-                    <td className="py-3 pr-3">
-                      <select className="input" value={draft.provider} onChange={(e) => setAuxDraft((prev) => ({ ...prev, [row.task]: { provider: e.target.value, model: e.target.value === 'auto' ? '' : providerModels(providers, e.target.value)[0] ?? draft.model } }))}>
-                        <option value="auto">auto</option>
-                        {providers.map((p) => <option key={p.slug || p.name} value={p.slug || p.name}>{p.name || p.slug}</option>)}
-                      </select>
-                    </td>
-                    <td className="py-3 pr-3">
-                      {models.length ? (
-                        <select className="input" value={draft.model} onChange={(e) => setAuxDraft((prev) => ({ ...prev, [row.task]: { ...draft, model: e.target.value } }))}>
-                          <option value="">default</option>
-                          {models.map((m: string) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      ) : (
-                        <input className="input" value={draft.model} onChange={(e) => setAuxDraft((prev) => ({ ...prev, [row.task]: { ...draft, model: e.target.value } }))} placeholder="default" />
-                      )}
-                    </td>
-                    <td className="py-3 text-right"><button className="btn-secondary text-xs" disabled={saving === row.task} onClick={() => saveAux(row.task)}>{lang === 'zh' ? '保存' : 'Save'}</button></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+
+        <div className="card">
+          {selectedProfile ? (
+            <div>
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-semibold">{selectedProfile.name}</h3>
+                  <div className="mt-1 truncate font-mono text-xs text-opc-text-2">{selectedProfile.path}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProfile.is_default && <span className="badge-accent text-xs">default</span>}
+                  <StatusBadge active={selectedProfile.has_env} trueLabel={lang === 'zh' ? '有 .env' : 'Has .env'} falseLabel={lang === 'zh' ? '无 .env' : 'No .env'} />
+                </div>
+              </div>
+
+              {detailError && <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-400">{detailError}</div>}
+
+              <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-opc-border bg-opc-bg p-3">
+                  <div className="text-xs text-opc-text-2">{lang === 'zh' ? '模型' : 'Model'}</div>
+                  <div className="mt-1 truncate font-mono text-sm">{profileModelSummary(selectedProfile)}</div>
+                </div>
+                <div className="rounded-lg border border-opc-border bg-opc-bg p-3">
+                  <div className="text-xs text-opc-text-2">{lang === 'zh' ? '技能数量' : 'Skills'}</div>
+                  <div className="mt-1 text-sm font-semibold">{selectedProfile.skill_count}</div>
+                </div>
+                <div className="rounded-lg border border-opc-border bg-opc-bg p-3">
+                  <div className="text-xs text-opc-text-2">{lang === 'zh' ? '类型' : 'Type'}</div>
+                  <div className="mt-1 text-sm font-semibold">{selectedProfile.is_default ? 'default' : 'named'}</div>
+                </div>
+              </div>
+
+              <div className="mb-4 rounded-lg border border-opc-border bg-opc-bg p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-opc-text-2">{lang === 'zh' ? 'Setup 命令' : 'Setup Command'}</div>
+                  <button className="btn-secondary text-xs" disabled={!setupCommand} onClick={copySetupCommand}>{lang === 'zh' ? '复制' : 'Copy'}</button>
+                </div>
+                <pre className="overflow-auto rounded-md bg-opc-surface-2 p-3 font-mono text-sm text-opc-text">{setupCommand || '-'}</pre>
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">SOUL.md</h3>
+                    <p className="mt-1 text-xs text-opc-text-2">{soulExists ? (lang === 'zh' ? '已存在' : 'Existing file') : (lang === 'zh' ? '保存后创建文件' : 'Will be created on save')}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn-secondary text-xs" disabled={!soulDirty || busy === 'soul'} onClick={() => setDetailVersion((value) => value + 1)}>{lang === 'zh' ? '撤销' : 'Revert'}</button>
+                    <button className="btn-primary text-xs" disabled={!soulDirty || busy === 'soul'} onClick={saveSoul}>{busy === 'soul' ? (lang === 'zh' ? '保存中...' : 'Saving...') : (lang === 'zh' ? '保存' : 'Save')}</button>
+                  </div>
+                </div>
+                <textarea
+                  className="h-[460px] w-full resize-none rounded-lg border border-opc-border bg-opc-bg p-4 font-mono text-sm leading-6 text-opc-text focus:border-opc-accent/50 focus:outline-none"
+                  value={soulContent}
+                  onChange={(e) => { setSoulContent(e.target.value); setSoulDirty(true) }}
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+          ) : (
+            <EmptyBlock label={lang === 'zh' ? '请选择 Profile' : 'Select a profile'} />
+          )}
         </div>
       </div>
     </div>
   )
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div className="flex justify-between gap-4 border-b border-opc-border py-2"><span className="text-opc-text-2">{label}</span><span className="text-right font-mono text-xs">{value}</span></div>
 }
 
 export function HermesConfigPage() {
